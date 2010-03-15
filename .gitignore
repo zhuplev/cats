@@ -12,3 +12,4 @@ BuildLog.htm
 /static
 /synhighlight
 /testutils
+*.fdb
