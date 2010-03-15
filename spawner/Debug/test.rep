@@ -1,0 +1,19 @@
+
+--------------- Spawner report ---------------
+Application:           test.cmd
+Parameters:            <none>
+SecurityLevel:         0
+CreateProcessMethod:   CreateProcess
+UserName:              Администратор
+UserTimeLimit:         Infinity
+DeadLine:              Infinity
+MemoryLimit:           Infinity
+WriteLimit:            Infinity
+----------------------------------------------
+UserTime:              0.020029 (sec)
+PeakMemoryUsed:        0.269531 (Mb)
+Written:               0.000000 (Mb)
+TerminateReason:       ExitProcess
+ExitStatus:            0
+----------------------------------------------
+SpawnerError:          <none>

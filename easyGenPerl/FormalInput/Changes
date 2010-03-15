@@ -1,0 +1,6 @@
+Revision history for Perl extension FormalInput.
+
+0.01  Sat Apr 26 15:59:24 2008
+	- original version; created by h2xs 1.23 with options
+		-Oan FormalInput
+

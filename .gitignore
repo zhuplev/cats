@@ -1,0 +1,14 @@
+*~
+/backup
+*.o
+*.tar.gz
+/judge/*/
+/perl
+BuildLog.htm
+*.vcproj
+*.dll
+*.exp
+*.lib1
+/static
+/synhighlight
+/testutils

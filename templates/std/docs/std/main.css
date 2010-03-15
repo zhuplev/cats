@@ -1,0 +1,160 @@
+body { 
+    scrollbar-face-color: #ffffff; 
+    scrollbar-highlight-color: #ffffff; 
+    scrollbar-arrow-color: #ffcc55; 
+    scrollbar-base-color: #ffcc55; 
+    background-color: #ffffff;  
+    color: #000000;
+    font-family: Arial;
+    font-size: 14px;
+    margin: 0;
+    width: 100%;
+}
+
+table.iface { width: 100%; border-collapse : collapse; }
+table.iface tr td { padding: 0; }
+
+.top { 
+    font-family: Arial; 
+    font-size: 13px; 
+    color: #ffffff 
+} 
+
+a.top, a.top:link, a.top:visited, a.top:active  { 
+    font-family: Arial; 
+    font-size: 13px; 
+    color: #ffffff; 
+    text-decoration: none 
+}
+
+a, a:link {
+    color: #4040ff;
+    font-family: Arial; 
+    text-decoration: none; 
+    font-size: 14px
+}
+
+.linksize { font-size: 14px }
+
+.filter {
+    /*filter: Alpha(Opacity=80, FinishOpacity=20, Style=1, StartX=0, StartY=100, FinishY=250);*/
+}
+
+select, option {
+    background-color: #ffffff;
+    border: 1px solid #4040ff;
+    height: 22px;
+    vertical-align: middle;
+}
+
+.down { background-repeat: no-repeat; }
+
+input {
+    height: 22px;
+    vertical-align: middle;
+}
+
+.file {
+    border: 1px solid #4040ff;
+    background: #ffffff;
+}
+
+.bordered {
+    border: 1px solid #4040ff;
+}
+
+.bordered2 {
+    color: white;
+    border: 1px solid white;
+    background-color: #ccccff;
+}
+
+table.internal_borders { border-collapse: collapse; }
+table.internal_borders td, table.internal_borders th { border: 1px solid #4040ff; }
+table.sample { border-collapse: collapse; border: 2px; }
+table.sample td, table.sample th { border: 1px solid black; padding: 5px; }
+table.sample td { vertical-align: top; }
+
+.button {
+    background-color: #ffffff;
+    border: 1px solid #4040ff;
+    color : #4040ff;
+}
+.button2 {
+    border: 1px solid #ffffff;
+    color: #ffffff;
+    background-color: #7070ff;
+}
+
+.signed, a.signed:link, a.signed:visited {
+    color: #ffffff;
+    font-size: 12px;
+}
+
+.signed2, a.signed2:link, a.signed2:visited {
+    color: #333300;
+    font-size: 12px;
+}
+
+th { font-size: 11pt; font-weight: bold; color:#000000; }
+td { font-size: 11pt }
+td.ts { font-size: 10pt; font-style: italic; }
+
+tr.run_details_OK { background-color: #A0FFA0 }
+tr.run_details_WA { background-color: #FFA0A0 }
+tr.run_details_PE { background-color: #FFFFA0 }
+tr.run_details_RE { background-color: #FFA0A0 }
+
+tr.run_details_IN { color: #A0A000 }
+tr.run_details_NP { color: #008000 }
+tr.run_details_NT { color: #000080; font-style: italic; }
+
+table.console tr:hover { background-color: #ffcc55; }
+table.console tr td { margin: 0; padding: 1px 10px 1px 1px; }
+table.console tr td, table.console tr td a { font-size: 10pt; }
+
+p { margin-top: 5px; margin-bottom: 5px } 
+
+ul { margin-top: 5px; margin-bottom: 5px } 
+
+h2 { margin-top: 10px; margin-bottom: 10px }
+h3 { margin-top: 10px; margin-bottom: 5px }
+h4 { margin-top: 10px; margin-bottom: 5px }
+code { margin-top: 0; margin-bottom: 0 }
+pre { margin-top: 0; margin-bottom: 0 }
+
+.diff_only_a { background-color: #FFA0A0 }
+.diff_only_b { background-color: #A0FFA0 }
+
+form.embedded { margin: 0 }
+a.current_link { font-weight: bold; }
+
+span.TeX { font-family: Arial Unicode Ms, Lucida Sans Unicode, Arial, sans serif; }
+span.TeX i { font-family: Times New Roman, serif; }
+span.TeX b { font-weight: normal; font-family: Times New Roman, serif; }
+span.TeX sup { white-space: nowrap; position: relative; left: 1px; }
+span.TeX sub { white-space: nowrap; position: relative; top: 2px; }
+span.TeX span.over { border-top: 1px solid black; padding: 0px 3px 0px 1px; }
+span.TeX span.num { font-family: Times New Roman, serif; }
+span.TeX span.sqrt { border-top: 1px solid black; padding-right: 2px; }
+span.TeX span.sqrt_sym { font-size: 18px; }
+span.TeX table.frac { border: 0; border-collapse: collapse; display: inline; vertical-align: middle; }
+span.TeX table.frac tr.nom td { border-bottom: 1px solid black; }
+span.TeX table.limits { border: 0; border-collapse: collapse; display: inline; text-align: center; vertical-align: middle; }
+span.TeX table.limits tr { vertical-align: middle; padding: 0; margin: 0; }
+span.TeX table.limits tr td.sub { vertical-align: top; padding: 0; margin: 0; font-size: small; }
+
+table.nobr tr td { white-space: nowrap; }
+
+a.spell { text-decoration: underline; color: red; }
+
+table.rank_table tr td p { padding: 0; margin: 0; font-size: 10px; }
+table.rank_table tr:hover {  background-color: #ffcc55; }
+
+div.problem_text { margin-left: 10px; margin-right: 10px; }
+div.problem_text h3, div.problem_text h4 {
+    font-style: italic;
+    page-break-after: avoid;
+}
+
+div.problem_text div { page-break-inside: avoid; }
