@@ -186,7 +186,7 @@ CREATE TABLE pictures (
 CREATE TABLE tests (
     problem_id      INTEGER REFERENCES problems(id) ON DELETE CASCADE,
     rank            INTEGER CHECK (rank > 0),
-    generator_id    INTEGER DEFAULT NULL REFERENCES problem_sources(id) ON DELETE CASCASE,
+    generator_id    INTEGER DEFAULT NULL REFERENCES problem_sources(id) ON DELETE CASCADE,
     param           VARCHAR(200) DEFAULT NULL,
     std_solution_id INTEGER DEFAULT NULL REFERENCES problem_sources(id) ON DELETE CASCADE,
     in_file         BLOB,
@@ -252,7 +252,7 @@ CREATE TABLE reqs (
     judge_id    INTEGER REFERENCES judges(id) ON DELETE SET NULL, 
     received    INTEGER DEFAULT 0 CHECK (received IN (0, 1)),
     points      INTEGER,
-    testsets    VARCHAR(200)
+    testsets    VARCHAR(200),
 );
 CREATE DESCENDING INDEX idx_reqs_submit_time ON reqs(submit_time);
 
