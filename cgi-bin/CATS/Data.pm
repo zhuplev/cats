@@ -64,7 +64,7 @@ sub enforce_request_state
     defined $p{state} or return;
     $dbh->do(qq~
         UPDATE reqs
-            SET failed_test = ?, state = ?, testsets = ?,
+            SET failed_test = ?, state = ?, testsets = ?, last_update = CATS_SYSDATE(),
                 points = NULL, received = 0, result_time = CATS_SYSDATE(), judge_id = NULL
             WHERE id = ?~, {},
         $p{failed_test}, $p{state}, $p{testsets}, $p{request_id}

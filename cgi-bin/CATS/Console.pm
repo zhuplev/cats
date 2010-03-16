@@ -26,8 +26,8 @@ sub send_question_to_jury
     ($previous_question_text || '') ne $question_text or return;
     
     my $s = $dbh->prepare(qq~
-        INSERT INTO questions(id, account_id, submit_time, question, received, clarified)
-        VALUES (?, ?, CATS_SYSDATE(), ?, 0, 0)~
+        INSERT INTO questions(id, account_id, submit_time, last_update, question, received, clarified)
+        VALUES (?, ?, CATS_SYSDATE(), CATS_SYSDATE(), ?, 0, 0)~
     );
     $s->bind_param(1, new_id);
     $s->bind_param(2, $cuid);       
@@ -107,6 +107,7 @@ sub console
             1 AS rtype,
             R.submit_time AS rank,
             CATS_DATE(R.submit_time) AS submit_time,
+            CATS_DATE(R.last_update) AS last_update,
             R.id AS id,
             R.state AS request_state,
             R.failed_test AS failed_test,
@@ -132,6 +133,7 @@ sub console
             2 AS rtype,
             Q.submit_time AS rank,
             CATS_DATE(Q.submit_time) AS submit_time,
+            CATS_DATE(Q.last_update) AS last_update,
             Q.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -150,6 +152,7 @@ sub console
             3 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
+            CATS_DATE(M.last_update) AS last_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -169,6 +172,7 @@ sub console
             4 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
+            CATS_DATE(M.last_update) AS last_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -180,10 +184,12 @@ sub console
             $dummy_account_block
             FROM messages M, dummy_table D
         ~,
+        #может быть тоже стоит отслеживать дату изменения начала контеста?
         contest_start => qq~
             5 AS rtype,
             C.start_date AS rank,
             CATS_DATE(C.start_date) AS submit_time,
+            CATS_DATE(C.start_date) AS last_update,
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -195,10 +201,12 @@ sub console
             $dummy_account_block
             FROM contests C, dummy_table D
         ~,
+        #может быть тоже стоит отслеживать дату изменения конца контеста?
         contest_finish => qq~
             6 AS rtype,
             C.finish_date AS rank,
             CATS_DATE(C.finish_date) AS submit_time,
+            CATS_DATE(C.finish_date) AS last_update,
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -324,7 +332,7 @@ sub console
 
     my $fetch_console_record = sub($)
     {            
-        my ($rtype, $rank, $submit_time, $id, $request_state, $failed_test, 
+        my ($rtype, $rank, $submit_time, $last_update, $id, $request_state, $failed_test, 
             $problem_title, $clarified, $question, $answer, $jury_message,
             $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
         ) = $_[0]->fetchrow_array
@@ -353,6 +361,7 @@ sub console
             href_answer_box =>      $is_jury ? url_f('answer_box', qid => $id) : undef,
             href_send_message_box =>$is_jury ? url_f('send_message_box', caid => $caid) : undef,
             'time' =>               $submit_time,
+            last_update =>          $last_update,
             problem_title =>        $problem_title,
             state_to_display($request_state,
                 # security: во время соревноваиня не показываем участникам

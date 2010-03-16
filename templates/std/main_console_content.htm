@@ -35,6 +35,9 @@
         ><TMPL_IF security_violation>Security violation</TMPL_IF
         ><TMPL_IF ignore_submit>Ignored submission</TMPL_IF></b>
     </td>
+    <td>
+      <font color="gray">last_update = <TMPL_VAR last_update></font>
+    </td>
 </TMPL_IF><TMPL_IF is_question>
     <td nowrap width=1%><TMPL_VAR time></td>
     <td align=left nowrap>
@@ -53,6 +56,9 @@
         </TMPL_UNLESS>
         <TMPL_IF href_delete><a href="<TMPL_VAR href_delete>" class="small">[удалить]</a></TMPL_IF>
     </td>
+    <td>
+      <font color="gray">last_update = <TMPL_VAR last_update></font>
+    </td>
 </TMPL_IF><TMPL_IF is_message>
     <td nowrap width=1%><TMPL_VAR time></td>
     <td align=left>
@@ -60,6 +66,9 @@
     </td>
     <td>
         <font color=red><TMPL_VAR message_text ESCAPE=HTML></font>
+    </td>
+    <td>
+      <font color="gray">last_update = <TMPL_VAR last_update></font>
     </td>
 </TMPL_IF><TMPL_IF is_broadcast>
     <td nowrap width=1%><TMPL_VAR time></td>
@@ -69,6 +78,9 @@
     <td>
         <b><font color=red><TMPL_VAR message_text ESCAPE=HTML></font></b>
     </td>
+    <td>
+      <font color="gray">last_update = <TMPL_VAR last_update></font>
+    </td>
 </TMPL_IF><TMPL_IF is_contest>
     <td nowrap width=1%><TMPL_VAR time></td>
     <td align=left>
@@ -77,6 +89,9 @@
     </td>
     <td>
         <b><a href="<TMPL_VAR href_problems>"><TMPL_VAR problem_title ESCAPE=HTML></a></b>
+    </td>
+    <td>
+      <font color="gray">last_update = <TMPL_VAR last_update></font>
     </td>
 </TMPL_IF>
 </tr>

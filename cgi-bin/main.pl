@@ -2326,7 +2326,7 @@ sub answer_box_frame
 
         my $s = $dbh->prepare(qq~
             UPDATE questions
-                SET clarification_time = CATS_SYSDATE(), answer = ?, received = 0, clarified = 1
+                SET clarification_time = CATS_SYSDATE(), last_update = CATS_SYSDATE(), answer = ?, received = 0, clarified = 1
                 WHERE id = ?~);
         $s->bind_param(1, $r->{answer}, { ora_type => 113 } );
         $s->bind_param(2, $qid);
