@@ -77,8 +77,9 @@ sub login_frame
         my $last_ip = CATS::IP::get_ip();
 
         if ($dbh->do(qq~
-            UPDATE accounts SET sid = ?, last_login = CATS_SYSDATE(), last_ip = ?
-                WHERE id = ?~,
+            UPDATE accounts SET
+                sid = ?, last_login = CATS_SYSDATE(), last_ip = ?
+            WHERE id = ?~,
             {}, $sid, $last_ip, $aid
         ))
         {
@@ -945,10 +946,11 @@ sub problems_submit
 
     $dbh->do(qq~
         INSERT INTO reqs (
-            id, account_id, problem_id, contest_id, 
-            submit_time, test_time, result_time, state, received
+            id, account_id, problem_id, contest_id, state, received,
+            submit_time, test_time, result_time, last_update
         ) VALUES (
-            ?,?,?,?,CATS_SYSDATE(),CATS_SYSDATE(),CATS_SYSDATE(),?,?)~,
+            ?,?,?,?,?,?,
+            CATS_SYSDATE(),CATS_SYSDATE(),CATS_SYSDATE(),CATS_SYSDATE())~,
         {},
         $rid, $submit_uid, $pid, $cid, $cats::st_not_processed, 0);
 
@@ -988,11 +990,11 @@ sub problems_submit_std_solution
 
         $dbh->do(qq~
             INSERT INTO reqs(
-                id, account_id, problem_id, contest_id,
-                submit_time, test_time, result_time, state, received
+                id, account_id, problem_id, contest_id, state, received,
+                submit_time, test_time, result_time, last_update
             ) VALUES (
-                ?, ?, ?, ?,
-                CATS_SYSDATE(), CATS_SYSDATE(), CATS_SYSDATE(), ?, 0)~,
+                ?, ?, ?, ?, ?, 0,
+                CATS_SYSDATE(),CATS_SYSDATE(),CATS_SYSDATE(),CATS_SYSDATE())~,
             {}, $rid, $uid, $pid, $cid, $cats::st_not_processed
         );
 
@@ -1597,8 +1599,13 @@ sub users_send_message
     my %p = @_;
     $p{'message'} ne '' or return;
     my $s = $dbh->prepare(qq~
-        INSERT INTO messages (id, send_time, text, account_id, received)
-            VALUES (?, CATS_SYSDATE(), ?, ?, 0)~
+        INSERT INTO messages (
+            id, text, account_id, received,
+            send_time, last_update
+        ) VALUES (
+            ?, ?, ?, 0,
+            CATS_SYSDATE(), CATS_SYSDATE()
+        )~
     );
     for (split ':', $p{'user_set'})
     {
@@ -1635,8 +1642,13 @@ sub users_send_broadcast
     my %p = @_;
     $p{'message'} ne '' or return;
     my $s = $dbh->prepare(qq~
-        INSERT INTO messages (id, send_time, text, account_id, broadcast)
-            VALUES(?, CATS_SYSDATE(), ?, NULL, 1)~
+        INSERT INTO messages (
+            id, text, account_id, broadcast,
+            send_time, last_update
+        ) VALUES (
+            ?, ?, NULL, 1,
+            CATS_SYSDATE(),CATS_SYSDATE()
+        )~
     );
     $s->bind_param(1, new_id);
     $s->bind_param(2, $p{'message'}, { ora_type => 113 });
@@ -2029,7 +2041,10 @@ sub judges_new_save
     $dbh->do(qq~
         INSERT INTO judges (
             id, nick, accept_contests, accept_trainings, lock_counter, is_alive, alive_date
-        ) VALUES (?, ?, 1, 1, ?, 0, CATS_SYSDATE())~, {}, 
+        ) VALUES (
+            ?, ?, 1, 1, ?, 0,
+            CATS_SYSDATE()
+        )~, {}, 
         new_id, $judge_name, $locked ? -1 : 0);
     $dbh->commit;
 }
@@ -2289,8 +2304,12 @@ sub send_message_box_frame
         my $message_text = param('message_text');
 
         my $s = $dbh->prepare(qq~
-            INSERT INTO messages (id, send_time, text, account_id, received)
-                VALUES (?, CURRENT_TIMESTAMP, ?, ?, 0)~);
+            INSERT INTO messages (
+                id, send_time, text, account_id, received, last_update
+            ) VALUES (
+                ?, CURRENT_TIMESTAMP, ?, ?, 0,
+                CATS_SYSDATE()
+            )~);
         $s->bind_param(1, new_id);
         $s->bind_param(2, $message_text, { ora_type => 113 });
         $s->bind_param(3, $caid);
@@ -2325,9 +2344,10 @@ sub answer_box_frame
         $r->{answer} .= " $a";
 
         my $s = $dbh->prepare(qq~
-            UPDATE questions
-                SET clarification_time = CATS_SYSDATE(), last_update = CATS_SYSDATE(), answer = ?, received = 0, clarified = 1
-                WHERE id = ?~);
+            UPDATE questions SET
+                clarification_time = CATS_SYSDATE(), last_update = CATS_SYSDATE(),
+                answer = ?, received = 0, clarified = 1
+            WHERE id = ?~);
         $s->bind_param(1, $r->{answer}, { ora_type => 113 } );
         $s->bind_param(2, $qid);
         $s->execute;
