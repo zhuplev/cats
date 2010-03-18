@@ -107,7 +107,7 @@ sub console
             1 AS rtype,
             R.submit_time AS rank,
             CATS_DATE(R.submit_time) AS submit_time,
-            CATS_DATE(R.result_time) AS last_update,
+            CATS_DATE(R.result_time) AS last_console_update,
             R.id AS id,
             R.state AS request_state,
             R.failed_test AS failed_test,
@@ -140,7 +140,7 @@ sub console
                 ELSE
                   Q.clarification_time
                 END
-              ) AS last_update,
+              ) AS last_console_update,
             Q.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -159,7 +159,7 @@ sub console
             3 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.send_time) AS last_update,
+            CATS_DATE(M.send_time) AS last_console_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -179,7 +179,7 @@ sub console
             4 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.send_time) AS last_update,
+            CATS_DATE(M.send_time) AS last_console_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -196,7 +196,7 @@ sub console
             5 AS rtype,
             C.start_date AS rank,
             CATS_DATE(C.start_date) AS submit_time,
-            CATS_DATE(C.start_date) AS last_update,
+            CATS_DATE(C.start_date) AS last_console_update,
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -213,7 +213,7 @@ sub console
             6 AS rtype,
             C.finish_date AS rank,
             CATS_DATE(C.finish_date) AS submit_time,
-            CATS_DATE(C.finish_date) AS last_update,
+            CATS_DATE(C.finish_date) AS last_console_update,
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -339,7 +339,7 @@ sub console
 
     my $fetch_console_record = sub($)
     {            
-        my ($rtype, $rank, $submit_time, $last_update, $id, $request_state, $failed_test, 
+        my ($rtype, $rank, $submit_time, $last_console_update, $id, $request_state, $failed_test, 
             $problem_title, $clarified, $question, $answer, $jury_message,
             $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
         ) = $_[0]->fetchrow_array
@@ -368,7 +368,7 @@ sub console
             href_answer_box =>      $is_jury ? url_f('answer_box', qid => $id) : undef,
             href_send_message_box =>$is_jury ? url_f('send_message_box', caid => $caid) : undef,
             'time' =>               $submit_time,
-            last_update =>          $last_update,
+            last_console_update =>          $last_console_update,
             problem_title =>        $problem_title,
             state_to_display($request_state,
                 # security: во время соревноваиня не показываем участникам
