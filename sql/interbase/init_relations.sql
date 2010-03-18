@@ -225,7 +225,7 @@ CREATE TABLE questions (
     answer      BLOB,
     account_id  INTEGER REFERENCES contest_accounts(id) ON DELETE CASCADE,
     received    INTEGER DEFAULT 0 CHECK (received IN (0, 1)),
-    last_update Timestamp NOT NULL /* дата последнего обновления вопроса */
+    last_update TIMESTAMP NOT NULL /* дата последнего обновления вопроса */
 );
 
 
@@ -236,7 +236,7 @@ CREATE TABLE messages (
     account_id  INTEGER REFERENCES contest_accounts(id) ON DELETE CASCADE,
     received    INTEGER DEFAULT 0 CHECK (received IN (0, 1)),
     broadcast   INTEGER DEFAULT 0 CHECK (broadcast IN (0, 1)),
-    last_update Timestamp NOT NULL /* дата последнего обновления сообщения */
+    last_update TIMESTAMP NOT NULL /* дата последнего обновления сообщения */
 );
 
 
@@ -255,7 +255,7 @@ CREATE TABLE reqs (
     received    INTEGER DEFAULT 0 CHECK (received IN (0, 1)),
     points      INTEGER,
     testsets    VARCHAR(200),
-    last_update Timestamp NOT NULL /* дата последнего обновления результата */
+    last_update TIMESTAMP NOT NULL /* дата последнего обновления результата */
 );
 CREATE DESCENDING INDEX idx_reqs_submit_time ON reqs(submit_time);
 
