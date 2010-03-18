@@ -1167,7 +1167,7 @@ sub set_request_state
 {
     my ($rid, $state, %p) = @_;
     $dbh->do(qq~
-        UPDATE reqs SET state = ?, failed_test = ? WHERE id = ? AND judge_id = ?~, {},
+        UPDATE reqs SET state = ?, failed_test = ?, result_time = CATS_SYSDATE() WHERE id = ? AND judge_id = ?~, {},
         $state, $p{failed_test}, $rid, $jid);
     if ($state == $cats::st_unhandled_error && defined $p{problem_id} && defined $p{contest_id})
     {
@@ -1426,4 +1426,4 @@ sql_disconnect;
 
 close FDLOG;
 
-1;                        
+1;                        

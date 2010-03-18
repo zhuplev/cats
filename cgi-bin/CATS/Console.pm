@@ -26,8 +26,8 @@ sub send_question_to_jury
     ($previous_question_text || '') ne $question_text or return;
     
     my $s = $dbh->prepare(qq~
-        INSERT INTO questions(id, account_id, submit_time, last_update, question, received, clarified)
-        VALUES (?, ?, CATS_SYSDATE(), CATS_SYSDATE(), ?, 0, 0)~
+        INSERT INTO questions(id, account_id, submit_time, question, received, clarified)
+        VALUES (?, ?, CATS_SYSDATE(), ?, 0, 0)~
     );
     $s->bind_param(1, new_id);
     $s->bind_param(2, $cuid);       
@@ -107,7 +107,7 @@ sub console
             1 AS rtype,
             R.submit_time AS rank,
             CATS_DATE(R.submit_time) AS submit_time,
-            CATS_DATE(R.last_update) AS last_update,
+            CATS_DATE(R.result_time) AS last_update,
             R.id AS id,
             R.state AS request_state,
             R.failed_test AS failed_test,
@@ -133,7 +133,14 @@ sub console
             2 AS rtype,
             Q.submit_time AS rank,
             CATS_DATE(Q.submit_time) AS submit_time,
-            CATS_DATE(Q.last_update) AS last_update,
+            CATS_DATE(
+              CASE
+                WHEN Q.clarification_time IS NULL THEN
+                  Q.submit_time
+                ELSE
+                  Q.clarification_time
+                END
+              ) AS last_update,
             Q.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -152,7 +159,7 @@ sub console
             3 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.last_update) AS last_update,
+            CATS_DATE(M.send_time) AS last_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -172,7 +179,7 @@ sub console
             4 AS rtype,
             M.send_time AS rank,
             CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.last_update) AS last_update,
+            CATS_DATE(M.send_time) AS last_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
