@@ -3314,6 +3314,9 @@ sub generate_menu
         { item => res_str(526), href => url_f('users') },
         { item => res_str(510),
           href => url_f('console', $is_jury ? () : (uf => $uid || get_anonymous_uid())) },
+        { item => res_str(5101),
+          href => url_f('ajax_console', $is_jury ? () : (uf => $uid || get_anonymous_uid())) },
+        
         ($is_jury ? () : { item => res_str(557), href => url_f('import_sources') }),
     );   
 
@@ -3365,7 +3368,9 @@ sub interface_functions ()
         settings => \&settings_frame,
         contests => \&contests_frame,
         console_content => \&CATS::Console::content_frame,
+        ajax_console_content => \&CATS::Console::ajax_content_frame,
         console => \&CATS::Console::console_frame,
+        ajax_console => \&CATS::Console::ajax_console_frame,
         console_export => \&CATS::Console::export,
         console_graphs => \&CATS::Console::graphs,
         problems => \&problems_frame,

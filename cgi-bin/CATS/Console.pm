@@ -3,7 +3,7 @@ package CATS::Console;
 use strict;
 use warnings;
 
-use CGI qw(:standard);;
+use CGI qw(:standard);
 use List::Util;
 
 use CATS::DB;
@@ -428,6 +428,351 @@ sub console
 }
 
 
+sub ajax_console
+{
+    my $template_name = shift;
+    init_listview_template('console', 'console', 'main_ajax_console_content.htm');
+
+    my $s = get_settings;
+    $s->{show_results} = 1 unless defined $s->{show_results};
+    $s->{show_messages} = 1 unless defined $s->{show_messages};
+    $t->param($_ => $s->{$_}) for qw(show_contests show_messages show_results);
+
+    my $day_count = time_interval_days($s);
+    my $dummy_account_block = q~
+        CAST(NULL AS INTEGER) AS team_id,
+        CAST(NULL AS VARCHAR(200)) AS team_name,
+        CAST(NULL AS VARCHAR(30)) AS country,
+        CAST(NULL AS VARCHAR(100)) AS last_ip,
+        CAST(NULL AS INTEGER) AS caid,
+        CAST(NULL AS INTEGER) AS contest_id
+    ~;
+    my %console_select = (
+        run => q~
+            1 AS rtype,
+            R.submit_time AS rank,
+            CATS_DATE(R.submit_time) AS submit_time,
+            CATS_DATE(R.result_time) AS last_console_update,
+            R.id AS id,
+            R.state AS request_state,
+            R.failed_test AS failed_test,
+            P.title AS problem_title,
+            CAST(NULL AS INTEGER) AS clarified,
+            D.t_blob AS question,
+            D.t_blob AS answer,
+            D.t_blob AS jury_message,
+            A.id AS team_id,
+            A.team_name AS team_name,
+            A.country AS country,
+            A.last_ip AS last_ip,
+            CA.id,
+            R.contest_id
+            FROM reqs R
+            INNER JOIN problems P ON R.problem_id=P.id
+            INNER JOIN accounts A ON R.account_id=A.id
+            INNER JOIN contests C ON R.contest_id=C.id
+            INNER JOIN contest_accounts CA ON CA.account_id=A.id AND CA.contest_id=R.contest_id,
+            dummy_table D
+        ~,
+        question => q~
+            2 AS rtype,
+            Q.submit_time AS rank,
+            CATS_DATE(Q.submit_time) AS submit_time,
+            CATS_DATE(
+              CASE
+                WHEN Q.clarification_time IS NULL THEN
+                  Q.submit_time
+                ELSE
+                  Q.clarification_time
+                END
+              ) AS last_console_update,
+            Q.id AS id,
+            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS VARCHAR(200)) AS problem_title,
+            Q.clarified AS clarified,
+            Q.question AS question,
+            Q.answer AS answer,
+            D.t_blob AS jury_message,
+            A.id AS team_id,
+            A.team_name AS team_name,
+            A.country AS country,
+            A.last_ip AS last_ip,
+            CA.id,
+            CA.contest_id~,
+        message => q~
+            3 AS rtype,
+            M.send_time AS rank,
+            CATS_DATE(M.send_time) AS submit_time,
+            CATS_DATE(M.send_time) AS last_console_update,
+            M.id AS id,
+            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS VARCHAR(200)) AS problem_title,
+            CAST(NULL AS INTEGER) AS clarified,
+            D.t_blob AS question,
+            D.t_blob AS answer,
+            M.text AS jury_message,
+            A.id AS team_id,
+            A.team_name AS team_name,
+            A.country AS country,
+            A.last_ip AS last_ip,
+            CA.id,
+            CA.contest_id
+        ~,
+        broadcast => qq~
+            4 AS rtype,
+            M.send_time AS rank,
+            CATS_DATE(M.send_time) AS submit_time,
+            CATS_DATE(M.send_time) AS last_console_update,
+            M.id AS id,
+            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS VARCHAR(200)) AS problem_title,
+            CAST(NULL AS INTEGER) AS clarified,
+            D.t_blob AS question,
+            D.t_blob AS answer,
+            M.text AS jury_message,
+            $dummy_account_block
+            FROM messages M, dummy_table D
+        ~,
+        #может быть тоже стоит отслеживать дату изменения начала контеста?
+        contest_start => qq~
+            5 AS rtype,
+            C.start_date AS rank,
+            CATS_DATE(C.start_date) AS submit_time,
+            CATS_DATE(C.start_date) AS last_console_update,
+            C.id AS id,
+            C.is_official AS request_state,
+            CAST(NULL AS INTEGER) AS failed_test,
+            C.title AS problem_title,
+            CAST(NULL AS INTEGER) AS clarified,
+            D.t_blob AS question,
+            D.t_blob AS answer,
+            D.t_blob AS jury_message,
+            $dummy_account_block
+            FROM contests C, dummy_table D
+        ~,
+        #может быть тоже стоит отслеживать дату изменения конца контеста?
+        contest_finish => qq~
+            6 AS rtype,
+            C.finish_date AS rank,
+            CATS_DATE(C.finish_date) AS submit_time,
+            CATS_DATE(C.finish_date) AS last_console_update,
+            C.id AS id,
+            C.is_official AS request_state,
+            CAST(NULL AS INTEGER) AS failed_test,
+            C.title AS problem_title,
+            CAST(NULL AS INTEGER) AS clarified,
+            D.t_blob AS question,
+            D.t_blob AS answer,
+            D.t_blob AS jury_message,
+            $dummy_account_block
+            FROM contests C, dummy_table D
+        ~,
+    );
+
+    my $user_filter = sprintf '%d', url_param('uf') || 0;
+
+    my $events_filter =
+        !$s->{show_results} ? ' AND 1 = 0' :
+        $user_filter ? 'AND A.id = ?' :
+        '';
+    my @events_filter_params = $s->{show_results} && $user_filter ? ($user_filter) : ();
+
+    my $contest_start_finish = '';
+    if ($s->{show_contests})
+    {
+        my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
+        $contest_start_finish = qq~
+          UNION
+            SELECT
+                $console_select{contest_start}
+                WHERE (C.start_date > CURRENT_TIMESTAMP - $day_count) AND
+                    (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+          UNION
+            SELECT
+                $console_select{contest_finish}
+                WHERE (C.finish_date > CURRENT_TIMESTAMP - $day_count) AND
+                    (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond~;
+    }
+    
+    my $broadcast = $s->{show_messages} ? qq~
+      UNION
+        SELECT
+            $console_select{broadcast}
+            WHERE (M.send_time > CURRENT_TIMESTAMP - $day_count) AND M.broadcast = 1~
+        : '';
+    
+    my $c;
+    if ($is_jury)
+    {
+        my $runs_filter = $is_root ? '' : ' AND C.id = ?';
+        my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
+        my @cid = $is_root ? () : ($cid);
+        $c = $dbh->prepare(qq~
+            SELECT
+                $console_select{run}
+                WHERE R.submit_time > CURRENT_TIMESTAMP - $day_count
+                $runs_filter$events_filter
+            UNION
+            SELECT
+                $console_select{question}
+                FROM questions Q, contest_accounts CA, dummy_table D, accounts A
+                WHERE (Q.submit_time > CURRENT_TIMESTAMP - $day_count) AND
+                Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
+                $events_filter
+            UNION
+            SELECT
+                $console_select{message}
+                FROM messages M, contest_accounts CA, dummy_table D, accounts A
+                WHERE (M.send_time > CURRENT_TIMESTAMP - $day_count) AND
+                M.account_id = CA.id AND A.id = CA.account_id$msg_filter
+                $events_filter
+            $broadcast
+            $contest_start_finish
+            ORDER BY 2 DESC~);
+        $c->execute(
+            @cid, @events_filter_params,
+            @cid, @events_filter_params,
+            @cid, @events_filter_params);
+    }
+    elsif ($is_team)
+    {
+        $c = $dbh->prepare(qq~
+            SELECT
+                $console_select{run}
+                WHERE (R.submit_time > CURRENT_TIMESTAMP - $day_count) AND
+                    C.id=? AND CA.is_hidden=0 AND
+                    (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                $events_filter
+            UNION
+            SELECT
+                $console_select{question}
+                FROM questions Q, contest_accounts CA, dummy_table D, accounts A
+                WHERE (Q.submit_time > CURRENT_TIMESTAMP - $day_count) AND
+                    Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+            UNION
+            SELECT
+                $console_select{message}
+                FROM messages M, contest_accounts CA, dummy_table D, accounts A 
+                WHERE (M.send_time > CURRENT_TIMESTAMP - $day_count) AND
+                    M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+            $broadcast
+            $contest_start_finish
+            ORDER BY 2 DESC~);
+        $c->execute(
+            $cid, $uid, @events_filter_params,
+            $cid, $uid,
+            $cid, $uid,
+        );
+    }
+    else
+    {
+        $c = $dbh->prepare(qq~
+            SELECT
+                $console_select{run}
+                WHERE (R.submit_time > CURRENT_TIMESTAMP - $day_count) AND
+                    R.contest_id=? AND CA.is_hidden=0 AND 
+                    (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                    $events_filter
+            $broadcast
+            $contest_start_finish
+            ORDER BY 2 DESC~);
+        $c->execute($cid, @events_filter_params);
+    }
+
+    my $fetch_console_record = sub($)
+    {            
+        my ($rtype, $rank, $submit_time, $last_console_update, $id, $request_state, $failed_test, 
+            $problem_title, $clarified, $question, $answer, $jury_message,
+            $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
+        ) = $_[0]->fetchrow_array
+            or return ();
+
+        $request_state = -1 unless defined $request_state;
+  
+        my ($country, $flag) = get_flag($country_abb);
+        (my $last_ip_short, $last_ip)  = CATS::IP::short_long(CATS::IP::filter_ip($last_ip));
+        return (
+            country => $country,
+            flag => $flag, 
+            is_submit_result =>     $rtype == 1,
+            is_question =>          $rtype == 2,
+            is_message =>           $rtype == 3,
+            is_broadcast =>         $rtype == 4,
+            is_contest =>           $rtype == 5 || $rtype == 6,
+            contest_start =>        $rtype == 5,
+            is_official =>          $request_state,
+            clarified =>            $clarified,
+            href_details => (
+                ($uid && $team_id && $uid == $team_id) ? url_f('run_details', rid => $id) : ''
+            ),
+            href_problems =>        url_function('problems', sid => $sid, cid => $id),
+            href_delete =>          $is_root ? url_f('console', delete_question => $id) : undef,
+            href_answer_box =>      $is_jury ? url_f('answer_box', qid => $id) : undef,
+            href_send_message_box =>$is_jury ? url_f('send_message_box', caid => $caid) : undef,
+            'time' =>               $submit_time,
+            last_console_update =>          $last_console_update,
+            problem_title =>        $problem_title,
+            state_to_display($request_state,
+                # security: во время соревноваиня не показываем участникам
+                # конкретные результаты других команд, а только accepted/rejected
+                $contest->{time_since_defreeze} <= 0 && !$is_jury &&
+                (!$is_team || !$team_id || $team_id != $uid)),
+            failed_test_index =>    $failed_test,
+            question_text =>        $question,
+            answer_text =>          $answer,
+            message_text =>         $jury_message,
+            team_name =>            $team_name,
+            last_ip =>              $last_ip,
+            last_ip_short =>        $last_ip_short,
+            is_jury =>              $is_jury,
+            id      =>              $id,
+            contest_id =>           $contest_id,
+        );
+    };
+
+    attach_listview(
+        url_f('console'), $fetch_console_record, $c, { page_params => { uf => $user_filter } });
+
+    $c->finish;
+
+    if ($is_team)
+    {
+        my @envelopes;
+        my $c = $dbh->prepare(qq~
+            SELECT id FROM reqs
+              WHERE account_id=? AND state>=$cats::request_processed AND received=0 AND contest_id=?~
+        );
+        $c->execute($uid, $cid);
+        while (my ($id) = $c->fetchrow_array)
+        {
+            push @envelopes, { href_envelope => url_f('envelope', rid => $id) };
+        }
+
+        $t->param(envelopes => [ @envelopes ]);
+        $dbh->commit; # Минимизируем шанс deadlock'а
+        $dbh->do(qq~
+            UPDATE reqs SET received=1
+                WHERE account_id=? AND state>=$cats::request_processed
+                AND received=0 AND contest_id=?~, {},
+            $uid, $cid);
+        $dbh->commit;
+    }
+
+    $t->param(
+        href_my_events_only => url_f('console', uf => ($uid || get_anonymous_uid())),
+        href_all_events => url_f('console', uf => 0),
+        user_filter => $user_filter
+    );
+    my $cc = $t->output;
+    init_template($template_name);
+
+    $t->param(console_content => $cc, is_team => $is_team);
+}
+
+
 sub select_all_reqs
 {
     my ($extra_cond) = @_;
@@ -523,7 +868,7 @@ sub graphs
       chco => join(',', map $colors[$_ % @colors], 0..@$ga),
       chdl => join('|', map $_->{code}, @$ga),
       chxt => 'x,y',
-      chxl => '0:|' . join('|', map sprintf('%.1f', $_ / $steps_per_hour), 0..@$bt),
+      chxl => '0:|' . join('|', map sprintf('%.1f', ($_) / $steps_per_hour), 0..@$bt),
       chxr => "1,0,$m",
     );
     $t->param(graph => join '&amp;', map "$_=$gp{$_}", keys %gp);
@@ -604,9 +949,66 @@ sub console_frame
 }
 
 
+sub ajax_console_frame
+{        
+    init_listview_template('console', 'console', 'main_ajax_console.htm');
+    my $s = get_settings;
+    if (defined param('filter') || defined param('visible'))
+    {
+        $s->{$_} = param($_) ? 1 : 0
+            for qw(show_contests show_messages show_results);
+    }
+
+    my $question_text = param('question_text');
+    my $selection = param('selection');
+
+    if (my $qid = param('delete_question'))
+    {
+        delete_question($qid);
+    }
+
+    if (defined param('retest'))
+    {
+        if (retest_submissions($selection))
+        {
+            $selection = '';
+        }
+    }
+
+    if (defined param('send_question'))
+    {
+        send_question_to_jury($question_text)
+            and $question_text = '';
+    }
+
+    $t->param(
+        href_console_content => url_f('ajax_console_content', uf => url_param('uf') || ''),
+        is_team => $is_team,
+        is_jury => $is_jury,
+        question_text => $question_text,
+        selection => $selection,
+        href_view_source => url_f('view_source'),
+        href_run_details => url_f('run_details'),
+        href_run_log => url_f('run_log'),
+        href_diff => url_f('diff_runs'),
+        title_suffix => res_str(510),
+    );
+    $t->param(submenu => [
+        { href_item => url_f('console_export'), item_name => res_str(561) },
+        { href_item => url_f('console_graphs'), item_name => res_str(563) },
+    ]) if $is_jury;
+}
+
+
 sub content_frame
 {
     console('main_console_iframe.htm');  
+}
+
+
+sub ajax_content_frame
+{
+    ajax_console('main_ajax_console_iframe.htm');  
 }
 
 
