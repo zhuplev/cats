@@ -9,6 +9,7 @@ use List::Util;
 use CATS::DB;
 use CATS::Misc qw(:all);
 use CATS::Data qw(:all);
+use CATS::AJAX::Console;
 
 sub send_question_to_jury
 {
@@ -536,7 +537,6 @@ sub ajax_console
             $dummy_account_block
             FROM messages M, dummy_table D
         ~,
-        #может быть тоже стоит отслеживать дату изменения начала контеста?
         contest_start => qq~
             5 AS rtype,
             C.start_date AS rank,
@@ -553,7 +553,6 @@ sub ajax_console
             $dummy_account_block
             FROM contests C, dummy_table D
         ~,
-        #может быть тоже стоит отслеживать дату изменения конца контеста?
         contest_finish => qq~
             6 AS rtype,
             C.finish_date AS rank,
@@ -1009,6 +1008,15 @@ sub content_frame
 sub ajax_content_frame
 {
     ajax_console('main_ajax_console_iframe.htm');  
+}
+
+
+sub ajax_response {
+    return CATS::AJAX::Console->new(
+        $dbh,
+        CGI->new,
+        collect_vars qw~cid uid hack_try server_time is_root is_team is_jury~,
+    )->get_response;
 }
 
 

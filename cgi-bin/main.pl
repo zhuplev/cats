@@ -23,7 +23,7 @@ use List::Util qw(max);
 my $cats_lib_dir;
 BEGIN {
     $cats_lib_dir = $ENV{CATS_DIR} || '.';
-    print $cats_lib_dir;
+    #print $cats_lib_dir;
     $cats_lib_dir =~ s/\/$//;
     $Data::Dumper::Terse = 1;
     $Data::Dumper::Indent = 1;
@@ -3409,6 +3409,13 @@ sub interface_functions ()
 }
 
 
+sub ajax_functions() {
+    return {
+        console => \&CATS::Console::ajax_response,
+    }
+}
+
+
 sub accept_request                                           
 {
     my $output_file = '';
@@ -3420,19 +3427,26 @@ sub accept_request
     initialize;
     $CATS::Misc::init_time = Time::HiRes::tv_interval(
         $CATS::Misc::request_start_time, [ Time::HiRes::gettimeofday ]);
-
-     unless (defined $t)
-     {
-         my $function_name = url_param('f') || '';
-         my $fn = interface_functions()->{$function_name} || \&about_frame;
-         # Функция возвращает -1 если результат генерировать не надо --
-         # например, если был сделан redirect.
-         ($fn->() || 0) == -1 and return;
-     }
-     save_settings;
-
-    generate_menu if defined $t;
-    generate_output($output_file);
+    
+    if (param('ajax')) {
+        print qq~Content-Type: text/plain; charset="utf-8"\n\n~; #must change to application/json
+        my $function_name = param('f') || '';
+        my $fn = ajax_functions()->{$function_name} || sub {'{"result":"unknown action"}'};
+        print $fn->();
+    } else {
+        unless (defined $t)
+        {
+            my $function_name = url_param('f') || '';
+            my $fn = interface_functions()->{$function_name} || \&about_frame;
+            # Функция возвращает -1 если результат генерировать не надо --
+            # например, если был сделан redirect.
+            ($fn->() || 0) == -1 and return;
+        }
+        save_settings;
+        
+        generate_menu if defined $t;
+        generate_output($output_file);
+    }
 }
 
 $CATS::Misc::request_start_time = [ Time::HiRes::gettimeofday ];

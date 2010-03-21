@@ -8,6 +8,7 @@ BEGIN
     @EXPORT = qw(
         cats_dir
         coalesce
+        collect_vars
         get_anonymous_uid
         split_fname
         initialize
@@ -73,6 +74,7 @@ use vars qw(
     $contest $t $sid $cid $uid $team_name $server_time $dbi_error
     $is_root $is_team $is_jury $can_create_contests $is_virtual $virtual_diff_time
     $listview_name $col_defs $request_start_time $init_time $settings $enc_settings
+    $hack_try
 );
 
 my ($listview_array_name, @messages, $http_mime_type, %extra_headers);
@@ -85,6 +87,15 @@ sub cats_dir()
 
 
 sub coalesce { defined && return $_ for @_ }
+
+
+sub collect_vars {
+    my $collection = {};
+    no strict 'refs';
+        $collection->{$_} = ${$_} for @_;
+    use strict;
+    return $collection;
+}
 
 
 sub get_anonymous_uid
@@ -590,6 +601,7 @@ sub init_user
     $is_root = 0;
     $can_create_contests = 0;
     $uid = undef;
+    $hack_try = undef;
     $team_name = undef;
     if ($sid ne '')
     {
@@ -599,6 +611,7 @@ sub init_user
         {
             init_template('main_bad_sid.htm');
             $sid = '';
+            $hack_try = 1;
             $t->param(href_login => url_f('login'));
         }
         else
