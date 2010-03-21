@@ -479,14 +479,7 @@ sub ajax_console
             2 AS rtype,
             Q.submit_time AS rank,
             CATS_DATE(Q.submit_time) AS submit_time,
-            CATS_DATE(
-              CASE
-                WHEN Q.clarification_time IS NULL THEN
-                  Q.submit_time
-                ELSE
-                  Q.clarification_time
-                END
-              ) AS last_console_update,
+            CATS_DATE(COALESCE(Q.clarification_time, Q.submit_time)) AS last_console_update,
             Q.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
