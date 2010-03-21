@@ -13,9 +13,9 @@ our @required_params = qw~last_update_timestamp~;
 
 sub data_validate {
     my $self = shift;
-    $self->{var}->{last_update_timestamp} =~ /^(\d\d)-(\d\d)-(\d\d\d\d) (\d\d):(\d\d)$/;
+    $self->{var}->{last_update_timestamp} =~ /^(\d\d)-(\d\d)-(\d\d\d\d), (\d\d):(\d\d):(\d\d)$/;
     eval {
-        timelocal(0, $5, $4, $1, $2, $3);
+        timelocal($6, $5, $4, $1, $2, $3);
         1;
     } or $self->{response}->{result} = 'invalid_update_timestamp';
 }

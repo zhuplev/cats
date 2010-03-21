@@ -1008,7 +1008,7 @@ sub ajax_response {
     return CATS::AJAX::Console->new(
         $dbh,
         CGI->new,
-        collect_vars qw~cid uid hack_try server_time is_root is_team is_jury~,
+        collect_vars qw~cid uid hack_try server_timestamp is_root is_team is_jury~,
     )->get_response;
 }
 

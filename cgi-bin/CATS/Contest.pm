@@ -12,7 +12,7 @@ sub database_fields {qw(
     local_only is_hidden
 )}
 
-use fields (database_fields(), qw(server_time time_since_start time_since_finish time_since_defreeze));
+use fields (database_fields(), qw(server_time server_timestamp time_since_start time_since_finish time_since_defreeze));
 
 use lib '..';
 use CATS::DB;
@@ -30,7 +30,9 @@ sub load
     my ($self, $cid) = @_;
     my $all_fields = [
         database_fields(),
-        'CATS_DATE(CATS_SYSDATE()) AS server_time',
+        'CATS_DATE(CATS_SYSDATE()) AS server_time', 'CAST(CURRENT_TIMESTAMP AS VARCHAR(24)) AS server_timestamp', 
+        #выбрать timestamp, чтобы не тужить БД постоянными запросами CATS_DATE(...)
+        #CAST -- извращение, но без него БД выдаёт CURRENT_TIMESTAMP в печатном виде. что то типа 'Вск 21 Мар 2010 23:26:21'
         map "CATS_SYSDATE() - ${_}_date AS time_since_$_", qw(start finish defreeze)
     ];
     my $r;

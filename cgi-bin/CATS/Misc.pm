@@ -40,7 +40,7 @@ BEGIN
     );
 
     @EXPORT_OK = qw(
-        $contest $t $sid $cid $uid $server_time
+        $contest $t $sid $cid $uid $server_time $server_timestamp
         $is_root $is_team $is_jury $is_virtual $virtual_diff_time
         $listview_name $init_time $settings);
 
@@ -71,7 +71,7 @@ use CATS::IP;
 use CATS::Contest;
 
 use vars qw(
-    $contest $t $sid $cid $uid $team_name $server_time $dbi_error
+    $contest $t $sid $cid $uid $team_name $server_time $server_timestamp $dbi_error
     $is_root $is_team $is_jury $can_create_contests $is_virtual $virtual_diff_time
     $listview_name $col_defs $request_start_time $init_time $settings $enc_settings
     $hack_try
@@ -645,6 +645,12 @@ sub init_contest
     $contest ||= CATS::Contest->new;
     $contest->load($cid);
     $server_time = $contest->{server_time};
+    
+    #Хотим server_timestamp в виде 'DD.MM.YYYY, HH:MM:SS', но после CAST(VARCHAR) имеем 'YYYY-MM-DD HH:MM:SS.SSSS'
+    $server_timestamp = $contest->{server_timestamp};
+    $server_timestamp =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+).(\d+)$/;
+    $server_timestamp = qq~$3.$2.$1, $4:$5:$6~;
+    
     $cid = $contest->{id};
 
     $virtual_diff_time = 0;
@@ -668,6 +674,7 @@ sub init_contest
         # При попытке просмотреть скрытый турнир показываем вместо него тренировочный
         $contest->load(0);
         $server_time = $contest->{server_time};
+        $server_timestamp = $contest->{server_timestamp}; #правда так и не понял зачем ещё раз перезаписывать $server_time
         $cid = $contest->{id};
     }
 }

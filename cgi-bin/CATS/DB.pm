@@ -48,7 +48,7 @@ sub new_id
     return $next_id++ unless $dbh;
     if ($CATS::Connect::db_dsn =~ /InterBase/)
     {
-        $dbh->selectrow_array(q~SELECT GEN_ID(key_seq, 1) FROM RDB$DATABASE~);
+        $dbh->selectrow_array(q~SELECT GEN_ID(key_seq, 1) FROM DUMMY_TABLE~);
     }
     elsif ($CATS::Connect::db_dsn =~ /Oracle/)
     {
