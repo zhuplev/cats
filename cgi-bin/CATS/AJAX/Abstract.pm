@@ -13,16 +13,25 @@ sub new {
     @{$self}{qw~dbh cgi var~} = @_;
     $class =~ /(.*::)*(.*)/;
     $self->{res_type} = lc $2;
+    
+    $self->check_permissions;
+    
     no strict 'refs';
         #также сохраняем переменные, имена которых указаны в our @required_params в наследуемом классе
         $self->{var}->{$_} = $self->{cgi}->param($_) for @{ref($self) . "::required_params"};
+        
+        #проверяем данные на корректность с помощью функции data_validate в наследуемом классе
+        my $data_validate = \&{ref($self) . "::data_validate"};
+        eval {$data_validate->($self); 1;};
+        
         #формируем ответ на запрос с помощью функции make_response в наследуемом классе
-        my $make_response = \&{ref($self) . "::make_response"};
-        #eval {$make_response->($self); 1;};
-        $make_response->($self);
+        #только в том случае, если запрос корректен
+        unless (defined $self->{response}->{result}) {
+            my $make_response = \&{ref($self) . "::make_response"};
+            #eval {$make_response->($self); 1;};
+            $make_response->($self);
+        }
     use strict;   
-    
-    $self->check_permissions;
     
     return $self;
 }
