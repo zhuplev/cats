@@ -1,0 +1,2 @@
+($use_rejected ? (rejected => 0 < grep $_, values %error) : %error),
+
