@@ -645,14 +645,7 @@ sub init_contest
     $contest ||= CATS::Contest->new;
     $contest->load($cid);
     $server_time = $contest->{server_time};
-    
-    #Хотим server_timestamp в виде 'DD.MM.YYYY, HH:MM:SS', но после CAST(VARCHAR) имеем 'YYYY-MM-DD HH:MM:SS.SSSS'
-    $server_timestamp = $contest->{server_timestamp};
-    $server_timestamp =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+).(\d+)$/;
-    $server_timestamp = qq~$3.$2.$1, $4:$5:$6~;
-    
     $cid = $contest->{id};
-
     $virtual_diff_time = 0;
     # авторизация пользователя в турнире
     $is_jury = 0;

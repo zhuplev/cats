@@ -14,13 +14,12 @@ our @required_params = qw~last_update_timestamp~;
 
 sub data_validate {
     my $self = shift;
-    $self->{var}->{last_update_timestamp} =~ /^(\d\d)\.(\d\d)\.(\d\d\d\d), (\d\d):(\d\d):(\d\d)$/;
+    $self->{var}->{last_update_timestamp} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d\d\d\d)$/;
     eval {
-        timelocal($6, $5, $4, $1, $2, $3);
+        timelocal($6, $5, $4, $3, $2, $1);
         1;
-    } or $self->{response}->{result} = 'invalid_update_timestamp';
+    } or $self->{response}->{result} = 'invalid_last_update_timestamp';
 }
-
 
 sub make_response {
     my $self = shift;
@@ -149,27 +148,48 @@ sub make_response {
             FROM contests C, dummy_table D
         ~,
     );
+    
+    my %need_update = (
+        run => q~
+            (R.result_time %s)
+        ~,
+        question => q~
+            (COALESCE(Q.clarification_time, Q.submit_time) %s)
+        ~,
+        message => q~
+            (M.send_time %s)
+        ~,
+        broadcast => q~
+            (M.send_time %s)
+        ~,
+        contest_start => q~
+            (C.start_date %s)
+        ~,
+        contest_finish => q~
+            (C.finish_date %s)
+        ~,
+    );
+    my $last_update_timestamp = sprintf " >= TIMESTAMP '%s'", $self->{var}->{last_update_timestamp};
+    $need_update{$_} = sprintf($need_update{$_}, $last_update_timestamp) for keys %need_update;
 
-    my $last_update_timestamp = "'" . $self->{var}->{last_update_timestamp} . "'" ;
-    my $need_update = qq~(CURRENT_TIMESTAMP >= $last_update_timestamp)~;
     my $contest_start_finish = '';
     my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
     $contest_start_finish = qq~
         UNION
             SELECT
                 $console_select{contest_start}
-                WHERE $need_update AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+                WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
           UNION
             SELECT
                 $console_select{contest_finish}
-                WHERE $need_update AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
+                WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
     ~;
     
     my $broadcast = qq~
       UNION
         SELECT
             $console_select{broadcast}
-            WHERE $need_update AND M.broadcast = 1~;
+            WHERE $need_update{broadcast} AND M.broadcast = 1~;
     
     my $c;
     if ($is_jury) {
@@ -179,18 +199,18 @@ sub make_response {
         $c = $dbh->prepare(qq~
             SELECT
                 $console_select{run}
-                WHERE $need_update $runs_filter
+                WHERE $need_update{run} $runs_filter
             UNION
             SELECT
                 $console_select{question}
                 FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update AND
+                WHERE $need_update{question} AND
                 Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
             UNION
             SELECT
                 $console_select{message}
                 FROM messages M, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update AND
+                WHERE $need_update{message} AND
                 M.account_id = CA.id AND A.id = CA.account_id$msg_filter
             $broadcast
             $contest_start_finish
@@ -200,20 +220,20 @@ sub make_response {
         $c = $dbh->prepare(qq~
             SELECT
                 $console_select{run}
-                WHERE $need_update AND
+                WHERE $need_update{run} AND
                     C.id=? AND CA.is_hidden=0 AND
                     (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
             UNION
             SELECT
                 $console_select{question}
                 FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update AND
+                WHERE $need_update{question} AND
                     Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
             UNION
             SELECT
                 $console_select{message}
                 FROM messages M, contest_accounts CA, dummy_table D, accounts A 
-                WHERE $need_update AND
+                WHERE $need_update{message} AND
                     M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
             $broadcast
             $contest_start_finish
@@ -223,7 +243,7 @@ sub make_response {
         $c = $dbh->prepare(qq~
             SELECT
                 $console_select{run}
-                WHERE $need_update AND
+                WHERE $need_update{run} AND
                     R.contest_id=? AND CA.is_hidden=0 AND 
                     (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
             $broadcast

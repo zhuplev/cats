@@ -79,7 +79,9 @@ sub sql_connect
         croak $m;
         0;
     };
-
+    
+     $dbh->{ib_time_all} = 'ISO';
+    
     $sql ||= SQL::Abstract->new;
 }
 

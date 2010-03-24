@@ -30,9 +30,8 @@ sub load
     my ($self, $cid) = @_;
     my $all_fields = [
         database_fields(),
-        'CATS_DATE(CATS_SYSDATE()) AS server_time', 'CAST(CURRENT_TIMESTAMP AS VARCHAR(24)) AS server_timestamp', 
+        'CATS_DATE(CATS_SYSDATE()) AS server_time', 'CURRENT_TIMESTAMP AS server_timestamp',
         #выбрать timestamp, чтобы не тужить БД постоянными запросами CATS_DATE(...)
-        #CAST -- извращение, но без него БД выдаёт CURRENT_TIMESTAMP в печатном виде. что то типа 'Вск 21 Мар 2010 23:26:21'
         map "CATS_SYSDATE() - ${_}_date AS time_since_$_", qw(start finish defreeze)
     ];
     my $r;
