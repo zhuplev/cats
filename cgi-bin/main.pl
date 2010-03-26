@@ -3429,7 +3429,8 @@ sub accept_request
         $CATS::Misc::request_start_time, [ Time::HiRes::gettimeofday ]);
     
     if (param('ajax')) {
-        print qq~Content-Type: text/plain; charset="utf-8"\n\n~; #must change to application/json
+        my @content_type = qw~application/json text/plain~;
+        print sprintf qq~Content-Type: %s; charset="utf-8"\n\n~, $content_type[param('debug')];
         my $function_name = param('f') || '';
         my $fn = ajax_functions()->{$function_name} || sub {'{"result":"unknown action"}'};
         print $fn->();
