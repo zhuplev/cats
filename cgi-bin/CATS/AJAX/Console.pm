@@ -9,16 +9,19 @@ use CATS::AJAX::Abstract;
 
 our @ISA = qw~CATS::AJAX::Abstract~;
 
-our @required_params = qw~last_update_timestamp~;
+
+sub required_params {
+    return qw~last_update_timestamp~;
+}
 
 
 sub data_validate {
     my $self = shift;
-    $self->{var}->{last_update_timestamp} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d\d\d\d)$/;
+    $self->{var}->{last_update_timestamp} =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     eval {
         timelocal($6, $5, $4, $3, $2, $1);
         1;
-    } or $self->{response}->{result} = 'invalid_last_update_timestamp';
+    } or die 'invalid_last_update_timestamp';
 }
 
 sub make_response {
@@ -169,8 +172,7 @@ sub make_response {
             (C.finish_date %s)
         ~,
     );
-    my $last_update_timestamp = sprintf " >= TIMESTAMP '%s'", $self->{var}->{last_update_timestamp};
-    $need_update{$_} = sprintf($need_update{$_}, $last_update_timestamp) for keys %need_update;
+    $_ = sprintf($_, " >= TIMESTAMP '$self->{var}->{last_update_timestamp}'") for values %need_update;
 
     my $contest_start_finish = '';
     my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
