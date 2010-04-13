@@ -634,7 +634,7 @@ sub init_user
 # получение информации о текущем турнире и установка турнира по умолчанию
 sub init_contest
 {
-    $cid = param('cid') || param('clist') || '';
+    $cid = url_param('cid') || param('cid') || param('clist') || '';
     $cid =~ s/^(\d+).*$/$1/; # берём первый турнир из clist
     if ($contest && ref $contest ne 'CATS::Contest') {
         use Data::Dumper;
