@@ -22,12 +22,12 @@ const DataConsole = $.inherit(
         },
         
         sendFisrtRequest : function() {
-            jQuery.ajax.post(this.utils.getMainURL(), this.getRequest(), utils.delegate(this, this.firstResponse));
+            jQuery.ajax.post(utils.getMainURL(), this.getRequest(), utils.delegate(this, this.firstResponse));
             this.json = {};
         },
         
         sendRequest : function() {
-            jQuery.ajax.post(this.url, this.getRequest(), utils.delegate(this, this.response));
+            jQuery.ajax.post(utils.getMainURL(), this.getRequest(), utils.delegate(this, this.response));
             this.json = {};
         },
         

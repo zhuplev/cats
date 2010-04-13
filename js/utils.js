@@ -109,7 +109,7 @@ const Utils = $.inherit(
         },  
         
         getMainURL : function() {
-            return window.location.href.match(/^.+pl/);
+            return window.location.href.match(/^(.+pl)\?/)[1];
         },
     }
 );
