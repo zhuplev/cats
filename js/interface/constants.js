@@ -26,7 +26,7 @@ const submitStatus = {
     },
     101 : {
         msg: "solution rejected",
-        testNum: true,
+        testNum: false,
         class: "submit_status_error",
     },
     11 : {
