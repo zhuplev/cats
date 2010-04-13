@@ -2,9 +2,8 @@ const DataConsole = $.inherit(
     DataAbstract,
     {
         __constructor : function() {
-            //сначала добавляем все данные и только потом вызываем конструктор базового класса!
-            this.setParam('f', 'console');
             this.__base();
+            this.setParam('f', 'console');
             this.ids = {
                 'teams' : {},
                 'problems' : {},
@@ -23,7 +22,7 @@ const DataConsole = $.inherit(
         },
         
         sendFisrtRequest : function() {
-            jQuery.ajax.post(this.url, this.getRequest(), utils.delegate(this, this.firstResponse));
+            jQuery.ajax.post(this.utils.getMainURL(), this.getRequest(), utils.delegate(this, this.firstResponse));
             this.json = {};
         },
         
