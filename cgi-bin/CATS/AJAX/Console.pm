@@ -7,7 +7,7 @@ use Time::Local;
 use CATS::IP;
 use CATS::AJAX::Abstract; 
 
-use Encode; #deprecated
+use Encode;
 
 our @ISA = qw~CATS::AJAX::Abstract~;
 
@@ -272,6 +272,7 @@ sub make_response {
     my ($problems, $teams) = ({}, {});
     
     while (my @row = $c->fetchrow_array) {
+        $_ = Encode::decode_utf8 $_ for @row; #Solve unicode problem
         my ($rtype, $rank, $submit_time, $last_console_update, $id, $request_state, $failed_test, 
             $problem_id, $problem_title, $clarified, $question, $answer, $jury_message,
             $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
@@ -283,13 +284,12 @@ sub make_response {
         my %current_row = (
             rtype =>                $rtype,
             is_official =>          $request_state,
-            clarified =>            Encode::decode('UTF-8', $clarified, Encode::FB_QUIET), #It should use UTF-8 encoding as default
+            clarified =>            $clarified,
             'time' =>               $submit_time,
             last_console_update =>  $last_console_update,
             problem_id =>           $problem_id,
             
-            contest_title =>        $rtype >= 4 ? Encode::decode('UTF-8', $problem_title, Encode::FB_QUIET) : undef,
-                #It should use UTF-8 encoding as default
+            contest_title =>        $rtype >= 4 ? $problem_title : undef,
                 #Небольшая магия: для задачи тут мы передаём id, поэтому $problem_title нам совсем не нужен, но
                 #в него передаётся имя турнира для данных о начале и конце турниров
             
@@ -303,9 +303,9 @@ sub make_response {
                 :
                     undef,
             failed_test =>    $failed_test,
-            question_text =>        Encode::decode('UTF-8', $question, Encode::FB_QUIET), #It should use UTF-8 encoding as default
-            answer_text =>          Encode::decode('UTF-8', $answer, Encode::FB_QUIET), #It should use UTF-8 encoding as default
-            message_text =>         Encode::decode('UTF-8', $jury_message, Encode::FB_QUIET), #It should use UTF-8 encoding as default
+            question_text =>        $question,
+            answer_text =>          $answer,
+            message_text =>         $jury_message,
             team_id =>              $team_id,
             last_ip =>              $self->{var}->{is_jury} ? $last_ip : undef,
             last_ip_short =>        $self->{var}->{is_jury} ? $last_ip_short : undef,
@@ -313,8 +313,8 @@ sub make_response {
             contest_id =>           $self->{var}->{is_root} ? $contest_id : undef,
         );
         
-        $problems->{$problem_id} = Encode::decode('UTF-8', $problem_title , Encode::FB_QUIET) if $problem_id; #It should use UTF-8 encoding as default
-        $teams->{$team_id} = Encode::decode('UTF-8', $team_name , Encode::FB_QUIET) if $team_id; #It should use UTF-8 encoding as default
+        $problems->{$problem_id} = $problem_title if $problem_id;
+        $teams->{$team_id} = $team_name if $team_id;
         
         for (keys %current_row) {
             delete $current_row{$_} if !defined $current_row{$_} || $current_row{$_} eq '';
