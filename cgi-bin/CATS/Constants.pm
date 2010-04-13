@@ -68,6 +68,7 @@ $st_testing = 3;
 $request_processed = 9;
 
 $st_accepted = 10;
+$st_rejected = 101;
 $st_wrong_answer = 11;
 $st_presentation_error = 12;
 $st_time_limit_exceeded = 13;

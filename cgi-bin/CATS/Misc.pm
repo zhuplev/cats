@@ -597,7 +597,7 @@ sub generate_password
 # авторизация пользователя, установка прав и настроек
 sub init_user
 {
-    $sid = url_param('sid') || '';
+    $sid = url_param('sid') || param('sid') || ''; #url_param - зло
     $is_root = 0;
     $can_create_contests = 0;
     $uid = undef;
@@ -634,7 +634,7 @@ sub init_user
 # получение информации о текущем турнире и установка турнира по умолчанию
 sub init_contest
 {
-    $cid = url_param('cid') || param('clist') || '';
+    $cid = param('cid') || param('clist') || '';
     $cid =~ s/^(\d+).*$/$1/; # берём первый турнир из clist
     if ($contest && ref $contest ne 'CATS::Contest') {
         use Data::Dumper;
@@ -645,6 +645,7 @@ sub init_contest
     $contest ||= CATS::Contest->new;
     $contest->load($cid);
     $server_time = $contest->{server_time};
+    $server_timestamp = $contest->{server_timestamp};
     $cid = $contest->{id};
     $virtual_diff_time = 0;
     # авторизация пользователя в турнире

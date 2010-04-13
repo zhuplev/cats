@@ -4,8 +4,9 @@ use strict;
 use warnings;
 use JSON::XS;
 
+use CATS::Constants;
 
-sub required_params {};
+sub required_json_params {};
 
 sub data_validate {};
 
@@ -20,10 +21,25 @@ sub new {
     @{$self}{qw~dbh cgi var~} = @_;
     $class =~ /(.*::)*(.*)/;
     $self->{res_type} = lc $2;
-    #также сохраняем переменные, имена которых указаны в our sub @required_params в наследуемом классе
-    $self->{var}->{$_} = $self->{cgi}->param($_) for ($self->required_params);
-        
+    
     eval {
+        my $r = $self->{cgi}->param('request');
+        if (defined $r) {
+            my $json = JSON::XS->new;
+            $json->utf8(1);
+            $self->{json} = $json->decode($r);
+            ref $self->{json} eq 'HASH' or die 'Incorrect json request. It must be an object.';
+        } else {
+            $self->{json} = {};
+        }
+        for ($self->required_json_params) {
+            my $arg = $self->{json}->{$_};
+                die sprintf "%s param is undef but it's required", $_ unless defined $arg;
+            $self->{var}->{$_} = $arg;
+            #также сохраняем переменные, имена которых указаны в our sub @required_json_params в наследуемом классе из JSON,
+            #переданного в параметр 'request' запроса
+        }
+        
         $self->check_permissions;
         $self->data_validate;
         $self->make_response;
@@ -45,7 +61,12 @@ sub get_response {
     my $json = JSON::XS->new;
     $json->utf8(1);
     $self->{response}->{result} ||= 'ok';
-    return $json->encode($self->{response});
+    $self->{response}->{server_timestamp} = $self->{var}->{server_timestamp};
+    
+    my $response = $json->encode($self->{response});
+    $response =~ s/"(-?\d{0,9})"/$1/g; #\d{0,9} вместо \d+ --- а вдруг кто-то задаст вопрос из одних цифр?
+        #а кто знает ещё способы убрать ковычки вокруг чисел?
+    return $response;
 }
 
 

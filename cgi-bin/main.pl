@@ -3368,7 +3368,6 @@ sub interface_functions ()
         settings => \&settings_frame,
         contests => \&contests_frame,
         console_content => \&CATS::Console::content_frame,
-        ajax_console_content => \&CATS::Console::ajax_content_frame,
         console => \&CATS::Console::console_frame,
         ajax_console => \&CATS::Console::ajax_console_frame,
         console_export => \&CATS::Console::export,

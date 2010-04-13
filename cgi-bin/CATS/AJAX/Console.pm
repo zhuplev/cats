@@ -7,10 +7,12 @@ use Time::Local;
 use CATS::IP;
 use CATS::AJAX::Abstract; 
 
+use Encode; #deprecated
+
 our @ISA = qw~CATS::AJAX::Abstract~;
 
 
-sub required_params {
+sub required_json_params {
     return qw~last_update_timestamp~;
 }
 
@@ -23,6 +25,7 @@ sub data_validate {
         1;
     } or die 'invalid_last_update_timestamp';
 }
+
 
 sub make_response {
     my $self = shift;
@@ -45,6 +48,7 @@ sub make_response {
             R.id AS id,
             R.state AS request_state,
             R.failed_test AS failed_test,
+            P.id AS problem_id,
             P.title AS problem_title,
             CAST(NULL AS INTEGER) AS clarified,
             D.t_blob AS question,
@@ -71,6 +75,7 @@ sub make_response {
             Q.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS INTEGER) AS problem_id,
             CAST(NULL AS VARCHAR(200)) AS problem_title,
             Q.clarified AS clarified,
             Q.question AS question,
@@ -90,6 +95,7 @@ sub make_response {
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS INTEGER) AS problem_id,
             CAST(NULL AS VARCHAR(200)) AS problem_title,
             CAST(NULL AS INTEGER) AS clarified,
             D.t_blob AS question,
@@ -110,6 +116,7 @@ sub make_response {
             M.id AS id,
             CAST(NULL AS INTEGER) AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS INTEGER) AS problem_id,
             CAST(NULL AS VARCHAR(200)) AS problem_title,
             CAST(NULL AS INTEGER) AS clarified,
             D.t_blob AS question,
@@ -126,6 +133,7 @@ sub make_response {
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS INTEGER) AS problem_id,
             C.title AS problem_title,
             CAST(NULL AS INTEGER) AS clarified,
             D.t_blob AS question,
@@ -142,6 +150,7 @@ sub make_response {
             C.id AS id,
             C.is_official AS request_state,
             CAST(NULL AS INTEGER) AS failed_test,
+            CAST(NULL AS INTEGER) AS problem_id,
             C.title AS problem_title,
             CAST(NULL AS INTEGER) AS clarified,
             D.t_blob AS question,
@@ -151,6 +160,9 @@ sub make_response {
             FROM contests C, dummy_table D
         ~,
     );
+    
+    $_ = ' FIRST 30 ' . $_ for values %console_select; #=)
+    
     
     my %need_update = (
         run => q~
@@ -255,47 +267,68 @@ sub make_response {
     }
     
     my (@submission, @contests, @messages);
-    my @rtype_ref = (\@submission, \@messages, \@messages, \@messages, @contests, \@contests);
+    my @rtype_ref = (\@submission, \@messages, \@messages, \@messages, \@contests, \@contests);
+    
+    my ($problems, $teams) = ({}, {});
     
     while (my @row = $c->fetchrow_array) {
         my ($rtype, $rank, $submit_time, $last_console_update, $id, $request_state, $failed_test, 
-            $problem_title, $clarified, $question, $answer, $jury_message,
+            $problem_id, $problem_title, $clarified, $question, $answer, $jury_message,
             $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
         ) = @row;
         
-        $request_state = -1 unless defined $request_state;
+        #$request_state = -1 unless defined $request_state; #просто не нужен, т.к. убили $request_state в запросе результатов попыток
         (my $last_ip_short, $last_ip)  = CATS::IP::short_long(CATS::IP::filter_ip($last_ip));
-        my @rtype = qw~is_submit_result is_question is_message is_broadcast contest_start contest_finish~;
+        --$rtype;
         my %current_row = (
-            rtype =>                $rtype[--$rtype],
+            rtype =>                $rtype,
             is_official =>          $request_state,
-            clarified =>            $clarified,
+            clarified =>            Encode::decode('UTF-8', $clarified, Encode::FB_QUIET), #It should use UTF-8 encoding as default
             'time' =>               $submit_time,
             last_console_update =>  $last_console_update,
-            problem_title =>        $problem_title,
-#             state_to_display($request_state,
-#                 # security: во время соревноваиня не показываем участникам
-#                 # конкретные результаты других команд, а только accepted/rejected
-#                 $contest->{time_since_defreeze} <= 0 && !$is_jury &&
-#                 (!$is_team || !$team_id || $team_id != $uid)),
-            failed_test_index =>    $failed_test,
-            question_text =>        $question,
-            answer_text =>          $answer,
-            message_text =>         $jury_message,
-            team_name =>            $team_name,
-            last_ip =>              $last_ip,
-            last_ip_short =>        $last_ip_short,
-            is_jury =>              $is_jury,
+            problem_id =>           $problem_id,
+            
+            contest_title =>        $rtype >= 4 ? Encode::decode('UTF-8', $problem_title, Encode::FB_QUIET) : undef,
+                #It should use UTF-8 encoding as default
+                #Небольшая магия: для задачи тут мы передаём id, поэтому $problem_title нам совсем не нужен, но
+                #в него передаётся имя турнира для данных о начале и конце турниров
+            
+            submit_status =>
+                # security: во время соревноваиня не показываем участникам
+                # конкретные результаты других команд, а только accepted/rejected
+                !$rtype ?
+                    ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
+                    $request_state > $cats::request_processed  && $request_state != $cats::st_accepted &&
+                    (!$is_team || !$team_id || $team_id != $uid)) ? $cats::st_rejected : $request_state
+                :
+                    undef,
+            failed_test =>    $failed_test,
+            question_text =>        Encode::decode('UTF-8', $question, Encode::FB_QUIET), #It should use UTF-8 encoding as default
+            answer_text =>          Encode::decode('UTF-8', $answer, Encode::FB_QUIET), #It should use UTF-8 encoding as default
+            message_text =>         Encode::decode('UTF-8', $jury_message, Encode::FB_QUIET), #It should use UTF-8 encoding as default
+            team_id =>              $team_id,
+            last_ip =>              $self->{var}->{is_jury} ? $last_ip : undef,
+            last_ip_short =>        $self->{var}->{is_jury} ? $last_ip_short : undef,
             id      =>              $id,
-            contest_id =>           $contest_id,
+            contest_id =>           $self->{var}->{is_root} ? $contest_id : undef,
         );
         
-       push @{$rtype_ref[$rtype]}, \%current_row;
+        $problems->{$problem_id} = Encode::decode('UTF-8', $problem_title , Encode::FB_QUIET) if $problem_id; #It should use UTF-8 encoding as default
+        $teams->{$team_id} = Encode::decode('UTF-8', $team_name , Encode::FB_QUIET) if $team_id; #It should use UTF-8 encoding as default
+        
+        for (keys %current_row) {
+            delete $current_row{$_} if !defined $current_row{$_} || $current_row{$_} eq '';
+        }
+        
+        push @{$rtype_ref[$rtype]}, \%current_row;
     }
     
-    $self->set_specific_param('submission', \@submission);
+    $self->set_specific_param('submissions', \@submission);
     $self->set_specific_param('contests', \@contests);
     $self->set_specific_param('messages', \@messages);
+    $self->set_specific_param('problems', $problems);
+    
+    $self->set_specific_param('teams', $teams);
 }
 
 

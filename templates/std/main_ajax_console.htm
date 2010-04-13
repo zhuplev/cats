@@ -52,9 +52,20 @@ function fill_1(aid, arg)
     return true;
 }
 </script>
+
+<script language="JavaScript" type="text/javascript" src="./js/interface/console.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/data/console.js"></script>
+
+<script language="JavaScript" type="text/javascript">
+    startEvent = function() {
+        dataset = new DataConsole();
+        interface = new InterfaceConsole();
+    }
+</script>
+
 <TMPL_IF message><i><TMPL_VAR message ESCAPE=HTML></i><br/></TMPL_IF>
 <span id="refreshable_content">
-<img src="http://www.julian-hirt.de/img/loading.gif"/>
+<img src="./images/std/ajax-page-loader.gif"/>
 </span>
 <TMPL_IF is_team>
 <br/>
@@ -76,11 +87,10 @@ function fill_1(aid, arg)
 </TMPL_IF>
     <tr bgcolor="#ccccff"><td>
     Вопрос к жюри:
-    <input size="100" maxlength="200" name="question_text" value="<TMPL_VAR question_text ESCAPE=HTML>" class="bordered" />
+    <input size="100" maxlength="200" name="question_text" value="<TMPL_VAR question_text ESCAPE=HTML>" class="bordered"/>
     <input type="submit" value="Отправить" name="send_question" class="button"/>
     </td></tr>
     </table>
 </TMPL_IF>
 </form>
-<iframe width="0" height="0" style="display: none" src="<TMPL_VAR href_console_content>"></iframe>
 <TMPL_INCLUDE "includes/menu_end.inc">

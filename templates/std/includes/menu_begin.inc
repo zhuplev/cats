@@ -7,8 +7,35 @@
 <meta http-equiv="Refresh" CONTENT="<TMPL_VAR refresh>">
 </TMPL_IF>
 <link rel="stylesheet" type="text/css" href="./docs/std/main.css">
+
+<script language="JavaScript" type="text/javascript" src="./js/jquery/jquery-1.4.2.min.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/jquery/jquery.inherit-1.1.1.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/jquery/jquery.json-2.2.min.js"></script>
+
+<script language="JavaScript" type="text/javascript" src="./js/interface/constants.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/data/constants.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/data/session.js"></script>
+
+<script language="JavaScript" type="text/javascript" src="./js/data/abstract.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/interface/abstract.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/utils.js"></script>
+<script language="JavaScript" type="text/javascript" src="./js/main.js"></script>
+<!--специально вне if, чтобы захешировалось пока юзер будет ходить вне консоли-->
+
+<TMPL_IF ajax>
+<script language="JavaScript" type="text/javascript">
+    //в init() вынести низя, потому что должны быть известны значения TMPL_VAR :-(
+    session = new Session(0<TMPL_VAR is_root>, 0<TMPL_VAR is_jury>, 0<TMPL_VAR is_team>, 0<TMPL_VAR ctype>);
+    //Объектно-ориентированная архитектура. Наружу выдана только одна функция и переменные, отвечающие за сбор и "отрисовку" данных
+    $(document).ready(init);
+</script>
+</TMPL_IF>
+
+
+
 </head>
 <body>
+<div id="message_to_admin"></div>
 <table class="iface">
   <tr bgcolor="#ffcc55" style="padding-bottom: 2px; height: 69px">
 	<td class="top" rowspan="2" width="1%">
