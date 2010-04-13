@@ -1,57 +1,95 @@
-var InterfaceConsoleComponent = {};
+var InterfaceConsoleLine = {};
 
-InterfaceConsoleComponent.abstract = $.inherit(
+InterfaceConsoleLine.abstract = $.inherit(
     {
-        __constructor : function(data) {
+        __constructor : function(dataset, data) {
+            this.dataset = dataset;
             this.data = data;
         },
         
         html : function() {
             var rtype = ['submit', 'question', 'message', 'broadcast', 'contestStart', 'contestFinish'][this.data.rtype];
             return String.format('<tr><td>{0}</td><td>{1}</td></tr>', this.data.time, rtype);
+        },
+    }
+);
+    
+InterfaceConsoleLine.status = $.inherit(
+    InterfaceConsoleLine.abstract,
+    {
+        html : function() {
+            var st = submitStatus[this.data.submit_status];
+            return String.format('<tr><td>{0}</td><td>{1}: {2} - {3}{4}</td></tr>',
+                this.data.time,
+                this.dataset.ids.teams[this.data.team_id],
+                this.dataset.ids.problems[this.data.problem_id],
+                st.msg,
+                st.testNum ? ' on test #' + this.data.failed_test : ''
+            );
+        },
+    }
+);
+    
+InterfaceConsoleLine.question = $.inherit(
+    InterfaceConsoleLine.abstract,
+    {
+        html : function() {
+            return String.format('<tr><td>{0}</td><td>{1}: {2} - {3}</td></tr>',
+                this.data.time,
+                this.dataset.ids.teams[this.data.team_id],
+                this.data.question_text,
+                this.data.answer_text
+            );
         }
     }
 );
-    
-InterfaceConsoleComponent.status = $.inherit(
-    InterfaceConsoleComponent.abstract,
+
+InterfaceConsoleLine.message = $.inherit(
+    InterfaceConsoleLine.abstract,
     {
-            
-    }
-);
-    
-InterfaceConsoleComponent.question = $.inherit(
-    InterfaceConsoleComponent.abstract,
-    {
-            
+        html : function() {
+            return String.format('<tr><td>{0}</td><td>JURY : {1} - "{2}"</td></tr>',
+                this.data.time,
+                this.dataset.ids.teams[this.data.team_id],
+                this.data.message_text
+            );
+        }
     }
 );
 
-InterfaceConsoleComponent.message = $.inherit(
-    InterfaceConsoleComponent.abstract,
+InterfaceConsoleLine.broadcast = $.inherit(
+    InterfaceConsoleLine.abstract,
     {
-            
+        html : function() {
+            return String.format('<tr><td>{0}</td><td> </b>BROADCAST</b> : {1}</td></tr>',
+                this.data.time,
+                this.data.message_text
+            );
+        }
     }
 );
 
-InterfaceConsoleComponent.broadcast = $.inherit(
-    InterfaceConsoleComponent.abstract,
+InterfaceConsoleLine.contestStart = $.inherit(
+    InterfaceConsoleLine.abstract,
     {
-            
+        html : function() {
+            return String.format('<tr><td>{0}</td><td> </b>contest start</b> : {1}</td></tr>',
+                this.data.time,
+                this.data.contest_title
+            );
+        }
     }
 );
 
-InterfaceConsoleComponent.contestStart = $.inherit(
-    InterfaceConsoleComponent.abstract,
+InterfaceConsoleLine.contestFinish = $.inherit(
+    InterfaceConsoleLine.abstract,
     {
-            
-    }
-);
-
-InterfaceConsoleComponent.contestFinish = $.inherit(
-    InterfaceConsoleComponent.abstract,
-    {
-            
+        html : function() {
+            return String.format('<tr><td>{0}</td><td> </b>contest finish</b> : {1}</td></tr>',
+                this.data.time,
+                this.data.contest_title
+            );
+        }
     }
 );
 
@@ -71,7 +109,7 @@ const InterfaceConsole = $.inherit(
         onUpdate : function() {
             var consoleContent = '';
             for (var i in dataset.current) {
-                var component = new this.__self.Component[dataset.current[i].rtype](dataset.current[i]);
+                var component = new this.__self.Line[dataset.current[i].rtype](dataset, dataset.current[i]);
                 consoleContent += component.html();
             }
             $('#refreshable_content').html(this.__self.consoleHeader + consoleContent + this.__self.consoleFooter);
@@ -97,59 +135,15 @@ const InterfaceConsole = $.inherit(
         
     },
     {
-        Component : [
-            InterfaceConsoleComponent.status,
-            InterfaceConsoleComponent.question,
-            InterfaceConsoleComponent.message,
-            InterfaceConsoleComponent.broadcast,
-            InterfaceConsoleComponent.contestStart,
-            InterfaceConsoleComponent.contestFinish,
+        Line : [
+            InterfaceConsoleLine.status,
+            InterfaceConsoleLine.question,
+            InterfaceConsoleLine.message,
+            InterfaceConsoleLine.broadcast,
+            InterfaceConsoleLine.contestStart,
+            InterfaceConsoleLine.contestFinish,
         ],
         consoleHeader : '<table>',
         consoleFooter : '</table>',
     }
 );
-
-
-    /*{
-        //список параметров, общих для всех видов rtype, являются обязательными
-        //commonParamList : ['time', 'id', 'last_console_update'],
-
-        rObject : [
-            //список параметров, которые будут вытаскиваться из JSON для каждого типа rtype
-            //paramList -- обязательные параметры для всех типою юзеров
-            //в случае их отсутствия громко кричим и показываем ошибку
-            //остальные -- опциональные, в случае их отсутствия, никто не знает, что будет
-            {
-                /*paramList : ['problem_id', 'team_id', 'submit_status'],
-                paramOptList : ['failed_test'],
-                paramRootListAdd : ['contest_id'],
-                paramJuryListAdd : ['last_ip_short', 'last_ip'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.status),
-            },
-            {
-                /*paramList : ['question_text', 'clarified', 'team_id', 'answer_text'],
-                paramRootListAdd : ['contest_id'],
-                paramJuryListAdd : ['last_ip_short', 'last_ip'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.question),
-            },
-            {
-                /*paramList : ['message_text', 'team_id'],
-                paramRootListAdd : ['contest_id'],
-                paramJuryListAdd : ['last_ip_short', 'last_ip'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.message),
-            },
-            {
-//                 paramList : ['message_text'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.broadcast),
-            },
-            {
-//                paramList : ['contest_title', 'is_official'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.contestStart),
-            },
-            {
-//                paramList : ['contest_title', 'is_official'],
-                component : utils.delegate(InterfaceConsoleComponent, InterfaceConsoleComponent.contestFinish),
-            },
-        ],
-    }*/
