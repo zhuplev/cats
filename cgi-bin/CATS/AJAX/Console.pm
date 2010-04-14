@@ -299,7 +299,10 @@ sub make_response {
                 !$rtype ?
                     ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
                     $request_state > $cats::request_processed  && $request_state != $cats::st_accepted &&
-                    (!$is_team || !$team_id || $team_id != $uid)) ? $cats::st_rejected : $request_state
+                    (!$is_team || !$team_id || $team_id != $uid)) && !$self->{var}->{contest}->{ctype} ?
+                        $cats::st_rejected
+                    :
+                        $request_state
                 :
                     undef,
             failed_test =>    $failed_test,
