@@ -265,7 +265,7 @@ sub make_response {
     my ($problems, $teams) = ({}, {});
     
     while (my $r = $c->fetchrow_hashref) {
-        $_ = Encode::decode_utf8 $_ for values %{$r}; #Solve unicode problem
+        $_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
         @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
         
         my %current_row = ();
