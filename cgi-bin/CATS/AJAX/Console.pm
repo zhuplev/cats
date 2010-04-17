@@ -172,17 +172,17 @@ sub make_response {
     my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
     $contest_start_finish = qq~
         UNION
-            SELECT
-                $console_select{contest_start}
-                WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
-          UNION
-            SELECT
-                $console_select{contest_finish}
-                WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
+        SELECT
+            $console_select{contest_start}
+            WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+        UNION
+        SELECT
+            $console_select{contest_finish}
+            WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
     ~;
     
     my $broadcast = qq~
-      UNION
+        UNION
         SELECT
             $console_select{broadcast}
             WHERE $need_update{broadcast} AND M.broadcast = 1~;
