@@ -176,7 +176,8 @@ sub make_response {
             (C.finish_date %s)
         ~,
     );
-    $_ = sprintf($_, " >= TIMESTAMP '$self->{var}->{last_update_timestamp}'") for values %need_update;
+    my $luts = $self->{var}->{last_update_timestamp};
+    $_ = sprintf($_, " >= ?") for values %need_update;
 
     my $contest_start_finish = '';
     my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
@@ -221,7 +222,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute(@cid, @cid, @cid);
+        $c->execute(map {$luts, @cid} 1..3, map {$luts} 1..3);
     } elsif ($is_team) {
         $c = $dbh->prepare(qq~
             SELECT
@@ -244,7 +245,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute($cid, $uid, $cid, $uid, $cid, $uid);
+        $c->execute(map {$cid, $uid, $luts} 1..3, map {$luts} 1..3);
     } else {
         $c = $dbh->prepare(qq~
             SELECT
@@ -255,7 +256,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute($cid);
+        $c->execute($luts, $cid, map {$luts} 1..3);
     }
     
     my (@submission, @contests, @messages);
