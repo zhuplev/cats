@@ -265,7 +265,7 @@ sub make_response {
     my ($problems, $teams) = ({}, {});
     
     while (my $r = $c->fetchrow_hashref) {
-        $_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
+        #$_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
         @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
         
         my %current_row = ();
@@ -312,6 +312,7 @@ sub make_response {
         $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
         
         !defined $current_row{$_} || $current_row{$_} eq '' and delete $current_row{$_} for keys %current_row;
+        $_ =~ /^\d{1,9}$/ and $_ = 0 + $_ for values %current_row; #cast to int type
         
         push @{$rtype_ref[$r->{rtype}]}, \%current_row;
     }

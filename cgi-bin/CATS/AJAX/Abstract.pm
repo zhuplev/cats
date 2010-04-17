@@ -59,14 +59,11 @@ sub check_permissions {
 sub get_response {
     my $self = shift;
     my $json = JSON::XS->new;
-    $json->utf8(1);
+    #$json->utf8(1);
     $self->{response}->{result} ||= 'ok';
     $self->{response}->{server_timestamp} = $self->{var}->{server_timestamp};
     
-    my $response = $json->encode($self->{response});
-    $response =~ s/"(-?\d{0,9})"/$1/g; #\d{0,9} вместо \d+ --- а вдруг кто-то задаст вопрос из одних цифр?
-        #а кто знает ещё способы убрать ковычки вокруг чисел?
-    return $response;
+    return $json->encode($self->{response});
 }
 
 
