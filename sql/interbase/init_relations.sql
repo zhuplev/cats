@@ -314,6 +314,8 @@ CREATE GENERATOR login_seq;
 
 SET GENERATOR key_seq TO 1; 
 
+--
+--это было давно и неправда (С)
 
 -- "0" зарезервирован для аккаунта администратора
 INSERT INTO accounts (id, login, passwd, team_name, srole) VALUES (0, 'ad', 'master', 'CATS administrator', 0);
