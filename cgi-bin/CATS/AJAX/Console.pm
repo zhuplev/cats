@@ -189,6 +189,7 @@ sub make_response {
             WHERE $need_update{broadcast} AND M.broadcast = 1~;
     
     my $c;
+    my @luts3 = ($luts) x 3;
     if ($is_jury) {
         my $runs_filter = $is_root ? '' : ' AND C.id = ?';
         my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
@@ -212,7 +213,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute(map {$luts, @cid} 1..3, map {$luts} 1..3);
+        $c->execute(($luts, @cid) x 3, @luts3);
     } elsif ($is_team) {
         $c = $dbh->prepare(qq~
             SELECT
@@ -235,7 +236,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute(map {$cid, $uid, $luts} 1..3, map {$luts} 1..3);
+        $c->execute(($luts, $cid, $uid) x 3, @luts3);
     } else {
         $c = $dbh->prepare(qq~
             SELECT
@@ -246,7 +247,7 @@ sub make_response {
             $broadcast
             $contest_start_finish
             ORDER BY 2 DESC~);
-        $c->execute($luts, $cid, map {$luts} 1..3);
+        $c->execute($luts, $cid, @luts3);
     }
     
     my (@submission, @contests, @messages);
