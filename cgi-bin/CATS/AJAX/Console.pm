@@ -311,9 +311,7 @@ sub make_response {
         $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified} && $r->{title};
         $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
         
-        for (keys %current_row) {
-            delete $current_row{$_} if !defined $current_row{$_} || $current_row{$_} eq '';
-        }
+        !defined $current_row{$_} || $current_row{$_} eq '' and delete $current_row{$_} for keys %current_row;
         
         push @{$rtype_ref[$r->{rtype}]}, \%current_row;
     }
