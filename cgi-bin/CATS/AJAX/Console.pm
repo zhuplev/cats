@@ -39,16 +39,6 @@ sub make_response {
         CAST(NULL AS INTEGER) AS contest_id
     ~;
     
-    my %alias_link = (
-        submit_state => 'state_or_official',
-        is_official => 'state_or_official',
-        problem_id => 'pid_or_clarified',
-        clarified => 'pid_or_clarified',
-        answer => 'jury_message',
-        message => 'jury_message',
-        'time' => 'submit_time',
-    );
-
     my %console_select = (
         run => q~
             1 AS rtype,
@@ -263,7 +253,17 @@ sub make_response {
     my @rtype_ref = (\@submission, \@messages, \@messages, \@messages, \@contests, \@contests);
     
     my ($problems, $teams) = ({}, {});
-    
+        
+    my %alias_link = (
+        submit_state => 'state_or_official',
+        is_official => 'state_or_official',
+        problem_id => 'pid_or_clarified',
+        clarified => 'pid_or_clarified',
+        answer => 'jury_message',
+        message => 'jury_message',
+        'time' => 'submit_time',
+    );
+
     while (my $r = $c->fetchrow_hashref) {
         #$_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
         @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
@@ -274,26 +274,18 @@ sub make_response {
             $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
         };
         
-        my $del_useless_fields = sub {
-            my $cond = shift;
-            $cond and delete $current_row{$_} for @_;
-        };
-        
-        $add_row->($_) for qw/time is_official submit_state clarified last_console_update
-            failed_test question answer message problem_id team_id id/;
+        $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
             
         $current_row{rtype} = --$r->{rtype};
         $current_row{title} = $r->{title} if $r->{rtype} >= $cons_contest_start;
         
-        my $d = $del_useless_fields;
-        $d->(!$r->{rtype}, qw/clarified is_official/);
-        $d->($r->{rtype}, qw/submit_state/);
-        $d->($r->{rtype} == $cons_question, qw/message problem_id/);
-        $d->($r->{rtype} == $cons_message, qw/answer/);
-        $d->($r->{rtype} == $cons_broadcast, qw/answer/);
-         
+        !$r->{rtype} and $add_row->($_) for qw/problem_id/;
+        $r->{rtype} == $cons_question and $add_row->($_) for qw/answer clarified/;
+        $r->{rtype} >= $cons_message and $add_row->($_) for qw/message/;
+        $r->{rtype} >= $cons_contest_start and $add_row->($_) for qw/is_official/;
+        
         my $rss = $r->{$alias_link{submit_state}}; #alias
-        $current_row{submit_status} = 
+        $current_row{submit_state} = 
             # security: во время соревноваиня не показываем участникам
             # конкретные результаты других команд, а только accepted/rejected
             !$r->{rtype} ?
