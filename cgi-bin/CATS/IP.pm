@@ -32,7 +32,7 @@ sub short_long
     my ($ip) = $_[0] || '';
     my ($short, @rest) = split /[,\s]+/, $ip;
     my $long = @rest ? $ip : '';
-    ($short, $long);
+    ($short || '', $long);
 }
 
 1;

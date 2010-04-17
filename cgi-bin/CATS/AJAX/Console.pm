@@ -34,11 +34,20 @@ sub make_response {
     my $dummy_account_block = q~
         CAST(NULL AS INTEGER) AS team_id,
         CAST(NULL AS VARCHAR(200)) AS team_name,
-        CAST(NULL AS VARCHAR(30)) AS country,
         CAST(NULL AS VARCHAR(100)) AS last_ip,
-        CAST(NULL AS INTEGER) AS caid,
         CAST(NULL AS INTEGER) AS contest_id
     ~;
+    
+    my %alias_link = (
+        submit_state => 'state_or_official',
+        is_official => 'state_or_official',
+        problem_id => 'pid_or_clarified',
+        clarified => 'pid_or_clarified',
+        answer => 'jury_message',
+        message => 'jury_message',
+        'time' => 'submit_time',
+    );
+
     my %console_select = (
         run => q~
             1 AS rtype,
@@ -46,19 +55,15 @@ sub make_response {
             CATS_DATE(R.submit_time) AS submit_time,
             CATS_DATE(R.result_time) AS last_console_update,
             R.id AS id,
-            R.state AS request_state,
+            R.state AS state_or_official,
             R.failed_test AS failed_test,
-            P.id AS problem_id,
-            P.title AS problem_title,
-            CAST(NULL AS INTEGER) AS clarified,
+            P.id AS pid_or_clarified,
+            P.title AS title,
             D.t_blob AS question,
-            D.t_blob AS answer,
             D.t_blob AS jury_message,
             A.id AS team_id,
             A.team_name AS team_name,
-            A.country AS country,
             A.last_ip AS last_ip,
-            CA.id,
             R.contest_id
             FROM reqs R
             INNER JOIN problems P ON R.problem_id=P.id
@@ -73,19 +78,15 @@ sub make_response {
             CATS_DATE(Q.submit_time) AS submit_time,
             CATS_DATE(COALESCE(Q.clarification_time, Q.submit_time)) AS last_console_update,
             Q.id AS id,
-            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
-            CAST(NULL AS INTEGER) AS problem_id,
-            CAST(NULL AS VARCHAR(200)) AS problem_title,
-            Q.clarified AS clarified,
+            Q.clarified AS pid_or_clarified,
+            CAST(NULL AS VARCHAR(200)) AS title,
             Q.question AS question,
-            Q.answer AS answer,
-            D.t_blob AS jury_message,
+            Q.answer AS jury_message,
             A.id AS team_id,
             A.team_name AS team_name,
-            A.country AS country,
             A.last_ip AS last_ip,
-            CA.id,
             CA.contest_id~,
         message => q~
             3 AS rtype,
@@ -93,19 +94,15 @@ sub make_response {
             CATS_DATE(M.send_time) AS submit_time,
             CATS_DATE(M.send_time) AS last_console_update,
             M.id AS id,
-            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
-            CAST(NULL AS INTEGER) AS problem_id,
-            CAST(NULL AS VARCHAR(200)) AS problem_title,
-            CAST(NULL AS INTEGER) AS clarified,
+            CAST(NULL AS INTEGER) AS pid_or_clarified,
+            CAST(NULL AS VARCHAR(200)) AS title,
             D.t_blob AS question,
-            D.t_blob AS answer,
             M.text AS jury_message,
             A.id AS team_id,
             A.team_name AS team_name,
-            A.country AS country,
             A.last_ip AS last_ip,
-            CA.id,
             CA.contest_id
         ~,
         broadcast => qq~
@@ -114,13 +111,11 @@ sub make_response {
             CATS_DATE(M.send_time) AS submit_time,
             CATS_DATE(M.send_time) AS last_console_update,
             M.id AS id,
-            CAST(NULL AS INTEGER) AS request_state,
+            CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
-            CAST(NULL AS INTEGER) AS problem_id,
-            CAST(NULL AS VARCHAR(200)) AS problem_title,
-            CAST(NULL AS INTEGER) AS clarified,
+            CAST(NULL AS INTEGER) AS pid_or_clarified,
+            CAST(NULL AS VARCHAR(200)) AS title,
             D.t_blob AS question,
-            D.t_blob AS answer,
             M.text AS jury_message,
             $dummy_account_block
             FROM messages M, dummy_table D
@@ -131,13 +126,11 @@ sub make_response {
             CATS_DATE(C.start_date) AS submit_time,
             CATS_DATE(C.start_date) AS last_console_update,
             C.id AS id,
-            C.is_official AS request_state,
+            C.is_official AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
-            CAST(NULL AS INTEGER) AS problem_id,
-            C.title AS problem_title,
-            CAST(NULL AS INTEGER) AS clarified,
+            CAST(NULL AS INTEGER) AS pid_or_clarified,
+            C.title AS title,
             D.t_blob AS question,
-            D.t_blob AS answer,
             D.t_blob AS jury_message,
             $dummy_account_block
             FROM contests C, dummy_table D
@@ -148,13 +141,11 @@ sub make_response {
             CATS_DATE(C.finish_date) AS submit_time,
             CATS_DATE(C.finish_date) AS last_console_update,
             C.id AS id,
-            C.is_official AS request_state,
+            C.is_official AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
-            CAST(NULL AS INTEGER) AS problem_id,
-            C.title AS problem_title,
-            CAST(NULL AS INTEGER) AS clarified,
+            CAST(NULL AS INTEGER) AS pid_or_clarified,
+            C.title AS title,
             D.t_blob AS question,
-            D.t_blob AS answer,
             D.t_blob AS jury_message,
             $dummy_account_block
             FROM contests C, dummy_table D
@@ -271,59 +262,48 @@ sub make_response {
     
     my ($problems, $teams) = ({}, {});
     
-    while (my @row = $c->fetchrow_array) {
-        $_ = Encode::decode_utf8 $_ for @row; #Solve unicode problem
-        my ($rtype, $rank, $submit_time, $last_console_update, $id, $request_state, $failed_test, 
-            $problem_id, $problem_title, $clarified, $question, $answer, $jury_message,
-            $team_id, $team_name, $country_abb, $last_ip, $caid, $contest_id
-        ) = @row;
+    while (my $r = $c->fetchrow_hashref) {
+        $_ = Encode::decode_utf8 $_ for values %{$r}; #Solve unicode problem
+        @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
         
-        #$request_state = -1 unless defined $request_state; #просто не нужен, т.к. убили $request_state в запросе результатов попыток
-        (my $last_ip_short, $last_ip)  = CATS::IP::short_long(CATS::IP::filter_ip($last_ip));
-        --$rtype;
-        my %current_row = (
-            rtype =>                $rtype,
-            is_official =>          $request_state,
-            clarified =>            $clarified,
-            'time' =>               $submit_time,
-            last_console_update =>  $last_console_update,
-            problem_id =>           $problem_id,
+        my %current_row = ();
+        my $add_row = sub {
+            my $param = shift;
+            $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
+        };
+        
+        $add_row->($_) for qw/time is_official submit_state clarified last_console_update
+            failed_test question answer message problem_id team_id id/;
             
-            contest_title =>        $rtype >= 4 ? $problem_title : undef,
-                #Небольшая магия: для задачи тут мы передаём id, поэтому $problem_title нам совсем не нужен, но
-                #в него передаётся имя турнира для данных о начале и конце турниров
-            
-            submit_status =>
-                # security: во время соревноваиня не показываем участникам
-                # конкретные результаты других команд, а только accepted/rejected
-                !$rtype ?
-                    ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
-                    $request_state > $cats::request_processed  && $request_state != $cats::st_accepted &&
-                    (!$is_team || !$team_id || $team_id != $uid)) && !$self->{var}->{contest}->{ctype} ?
-                        $cats::st_rejected
-                    :
-                        $request_state
+        $current_row{rtype} = --$r->{rtype};
+        $current_row{title} = $r->{title} if $r->{rtype} >= 4;
+        !$r->{rtype} and delete $current_row{$_} for qw/clarified is_official/;
+        $r->{rtype} and delete $current_row{$_} for qw/submit_state/;
+        
+        my $rss = $r->{$alias_link{submit_state}}; #alias
+        $current_row{submit_status} = 
+            # security: во время соревноваиня не показываем участникам
+            # конкретные результаты других команд, а только accepted/rejected
+            !$r->{rtype} ?
+                ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
+                $rss > $cats::request_processed  && $rss != $cats::st_accepted &&
+                (!$is_team || !$r->{team_id} || $r->{team_id} != $uid)) && !$self->{var}->{contest}->{ctype} ?
+                    $cats::st_rejected
                 :
-                    undef,
-            failed_test =>    $failed_test,
-            question_text =>        $question,
-            answer_text =>          $answer,
-            message_text =>         $jury_message,
-            team_id =>              $team_id,
-            last_ip =>              $self->{var}->{is_jury} ? $last_ip : undef,
-            last_ip_short =>        $self->{var}->{is_jury} ? $last_ip_short : undef,
-            id      =>              $id,
-            contest_id =>           $self->{var}->{is_root} ? $contest_id : undef,
-        );
+                    $rss
+            :
+                undef;
+        $self->{var}->{is_jury} and $add_row->($_) for qw/last_ip last_ip_short/;
+        $self->{var}->{is_root} and $add_row->($_) for qw/contest_id/;
         
-        $problems->{$problem_id} = $problem_title if $problem_id;
-        $teams->{$team_id} = $team_name if $team_id;
+        $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified};
+        $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
         
         for (keys %current_row) {
             delete $current_row{$_} if !defined $current_row{$_} || $current_row{$_} eq '';
         }
         
-        push @{$rtype_ref[$rtype]}, \%current_row;
+        push @{$rtype_ref[$r->{rtype}]}, \%current_row;
     }
     
     $self->set_specific_param('submissions', \@submission);

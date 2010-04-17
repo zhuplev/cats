@@ -18,7 +18,7 @@ InterfaceConsoleLine.status = $.inherit(
     InterfaceConsoleLine.abstract,
     {
         html : function() {
-            var st = submitStatus[this.data.submit_status];
+            var st = submitStatus[this.data.submit_state];
             return String.format('<tr><td>{0}</td><td>{1}: {2} - {3}{4}</td></tr>',
                 this.data.time,
                 this.dataset.ids.teams[this.data.team_id],
@@ -37,8 +37,8 @@ InterfaceConsoleLine.question = $.inherit(
             return String.format('<tr><td>{0}</td><td>{1}: {2} - {3}</td></tr>',
                 this.data.time,
                 this.dataset.ids.teams[this.data.team_id],
-                this.data.question_text,
-                this.data.answer_text
+                this.data.question,
+                this.data.answer
             );
         }
     }
@@ -51,7 +51,7 @@ InterfaceConsoleLine.message = $.inherit(
             return String.format('<tr><td>{0}</td><td>JURY : {1} - "{2}"</td></tr>',
                 this.data.time,
                 this.dataset.ids.teams[this.data.team_id],
-                this.data.message_text
+                this.data.message
             );
         }
     }
@@ -63,7 +63,7 @@ InterfaceConsoleLine.broadcast = $.inherit(
         html : function() {
             return String.format('<tr><td>{0}</td><td> </b>BROADCAST</b> : {1}</td></tr>',
                 this.data.time,
-                this.data.message_text
+                this.data.message
             );
         }
     }
@@ -75,7 +75,7 @@ InterfaceConsoleLine.contestStart = $.inherit(
         html : function() {
             return String.format('<tr><td>{0}</td><td> </b>contest start</b> : {1}</td></tr>',
                 this.data.time,
-                this.data.contest_title
+                this.data.title
             );
         }
     }
@@ -87,7 +87,7 @@ InterfaceConsoleLine.contestFinish = $.inherit(
         html : function() {
             return String.format('<tr><td>{0}</td><td> </b>contest finish</b> : {1}</td></tr>',
                 this.data.time,
-                this.data.contest_title
+                this.data.title
             );
         }
     }
