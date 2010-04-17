@@ -28,6 +28,7 @@ jQuery.ajax.post = function(url, data, succFunc) {
                  );   
                 errFunc(XMLHttpRequest, textStatus, undefined);
             } else {
+                $("#message_to_admin").html('');
                 succFunc(dataResponse, textStatus, XMLHttpRequest);
             }
         },
