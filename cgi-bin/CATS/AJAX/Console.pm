@@ -166,7 +166,6 @@ sub make_response {
             (C.finish_date %s)
         ~,
     );
-    my $luts = $self->{var}->{last_update_timestamp};
     $_ = sprintf($_, " >= ?") for values %need_update;
 
     my $contest_start_finish = '';
@@ -189,6 +188,7 @@ sub make_response {
             WHERE $need_update{broadcast} AND M.broadcast = 1~;
     
     my $c;
+    my $luts = $self->{var}->{last_update_timestamp};
     my @luts3 = ($luts) x 3;
     if ($is_jury) {
         my $runs_filter = $is_root ? '' : ' AND C.id = ?';
