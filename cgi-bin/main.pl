@@ -3429,7 +3429,7 @@ sub accept_request
     
     if (param('ajax')) {
         my @content_type = qw~application/json text/plain~;
-        print sprintf qq~Content-Type: %s; charset="utf-8"\n\n~, $content_type[param('debug')];
+        print sprintf qq~Content-Type: %s; charset=utf-8\n\n~, $content_type[param('debug')];
         my $function_name = param('f') || '';
         my $fn = ajax_functions()->{$function_name} || sub {'{"result":"unknown action"}'};
         print $fn->();
