@@ -26,6 +26,7 @@ sub data_validate {
     } or die 'invalid_last_update_timestamp';
 }
 
+my ($cons_run, $cons_question, $cons_message, $cons_broadcast, $cons_contest_start, $cons_contest_finish) = (0..5);
 
 sub make_response {
     my $self = shift;
@@ -272,14 +273,24 @@ sub make_response {
             $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
         };
         
+        my $del_useless_fields = sub {
+            my $cond = shift;
+            $cond and delete $current_row{$_} for @_;
+        };
+        
         $add_row->($_) for qw/time is_official submit_state clarified last_console_update
             failed_test question answer message problem_id team_id id/;
             
         $current_row{rtype} = --$r->{rtype};
-        $current_row{title} = $r->{title} if $r->{rtype} >= 4;
-        !$r->{rtype} and delete $current_row{$_} for qw/clarified is_official/;
-        $r->{rtype} and delete $current_row{$_} for qw/submit_state/;
+        $current_row{title} = $r->{title} if $r->{rtype} >= $cons_contest_start;
         
+        my $d = $del_useless_fields;
+        $d->(!$r->{rtype}, qw/clarified is_official/);
+        $d->($r->{rtype}, qw/submit_state/);
+        $d->($r->{rtype} == $cons_question, qw/message problem_id/);
+        $d->($r->{rtype} == $cons_message, qw/answer/);
+        $d->($r->{rtype} == $cons_broadcast, qw/answer/);
+         
         my $rss = $r->{$alias_link{submit_state}}; #alias
         $current_row{submit_status} = 
             # security: во время соревноваиня не показываем участникам
@@ -296,7 +307,7 @@ sub make_response {
         $self->{var}->{is_jury} and $add_row->($_) for qw/last_ip last_ip_short/;
         $self->{var}->{is_root} and $add_row->($_) for qw/contest_id/;
         
-        $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified};
+        $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified} && $r->{title};
         $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
         
         for (keys %current_row) {
