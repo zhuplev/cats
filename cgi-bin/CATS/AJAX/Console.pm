@@ -23,18 +23,52 @@ sub optional_json_params {
 
 
 sub timestamp_validate {
-    my ($self, $param_name) = @_;
-    $self->{var}->{$param_name} =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
+    my ($self, $value) = @_;
+    $value =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     eval {
         timelocal($6, $5, $4, $3, $2, $1);
+        1;
+    } or die "invalid value: $value";
+}
+
+
+sub var_timestamp_validate {
+    my ($self, $param_name) = @_;
+    eval {
+        $self->timestamp_validate($self->{var}->{$param_name});
         1;
     } or die "invalid $param_name";
 }
 
 
+sub array_timestamp_validate {
+    my ($self, $arr_ref) = @_;
+    $self->timestamp_validate($_) for @{$arr_ref};
+}
+
+
 sub data_validate {
+    no strict; #Это может быть не хорошо, но пока так
     my $self = shift;
-    $self->timestamp_validate('last_update_timestamp');
+    $self->var_timestamp_validate('last_update_timestamp');
+    for (qw~between and after~) {
+        ${$_} = \$self->{var}->{$_};
+        undef $${$_} if ref $${$_} ne 'ARRAY';
+    }
+    
+    defined($$between) and defined($$and) and defined($$after) and die
+        "Unknown request type: expected only either 'between'..'and', or 'after', but both have found";
+    defined($$between) ^ defined($$and) and die
+        "Unknown request type: 'between' and 'and' arrays are expected together, but only one of them has found";
+    
+    if (defined($$between) && defined($$and)) {
+        @{$$between} == @{$$and} or die "'between' and 'and' have different lenghts";
+        $self->array_timestamp_validate($${$_}) for qw~between and~;
+    } elsif (defined $$after) {
+        $self->array_timestamp_validate($${$_}) for qw~after~;
+    } else {
+        die "Unknown request type: neither 'between'..'and', nor 'after' has found";
+    }
 }
 
 my ($cons_run, $cons_question, $cons_message, $cons_broadcast, $cons_contest_start, $cons_contest_finish) = (0..5);
