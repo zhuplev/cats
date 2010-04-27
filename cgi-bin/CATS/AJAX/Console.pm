@@ -56,18 +56,15 @@ sub data_validate {
         undef $${$_} if ref $${$_} ne 'ARRAY';
     }
     
-    defined($$between) and defined($$and) and defined($$after) and die
-        "Unknown request type: expected only either 'between'..'and', or 'after', but both have found";
     defined($$between) ^ defined($$and) and die
         "Unknown request type: 'between' and 'and' arrays are expected together, but only one of them has found";
     
     if (defined($$between) && defined($$and)) {
         @{$$between} == @{$$and} or die "'between' and 'and' have different lenghts";
         $self->array_timestamp_validate($${$_}) for qw~between and~;
-    } elsif (defined $$after) {
+    }
+    if (defined $$after) {
         $self->array_timestamp_validate($${$_}) for qw~after~;
-    } else {
-        die "Unknown request type: neither 'between'..'and', nor 'after' has found";
     }
 }
 
@@ -77,6 +74,7 @@ sub make_response {
     my $self = shift;
     my $dbh = $self->{dbh};
     my ($is_root, $is_jury, $is_team, $cid, $uid, $contest) = @{$self->{var}}{qw~is_root is_jury is_team cid uid contest~};
+    
     my $dummy_account_block = q~
         CAST(NULL AS INTEGER) AS team_id,
         CAST(NULL AS VARCHAR(200)) AS team_name,
@@ -213,153 +211,209 @@ sub make_response {
     );
     $_ = sprintf($_, " >= ?") for values %need_update;
     
-    my $contest_start_finish = '';
-    my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
-    $contest_start_finish = qq~
-        UNION
-        SELECT
-            $console_select{contest_start}
-            WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
-        UNION
-        SELECT
-            $console_select{contest_finish}
-            WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
-    ~;
-    
-    my $broadcast = qq~
-        UNION
-        SELECT
-            $console_select{broadcast}
-            WHERE $need_update{broadcast} AND M.broadcast = 1~;
-    
-    my $c;
-    my $luts = $self->{var}->{last_update_timestamp};
-    my @luts3 = ($luts) x 3;
-    if ($is_jury) {
-        my $runs_filter = $is_root ? '' : ' AND C.id = ?';
-        my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
-        my @cid = $is_root ? () : ($cid);
-        $c = $dbh->prepare(qq~
-            SELECT
-                $console_select{run}
-                WHERE $need_update{run} $runs_filter
-            UNION
-            SELECT
-                $console_select{question}
-                FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update{question} AND
-                Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
-            UNION
-            SELECT
-                $console_select{message}
-                FROM messages M, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update{message} AND
-                M.account_id = CA.id AND A.id = CA.account_id$msg_filter
-            $broadcast
-            $contest_start_finish
-            ORDER BY 2 DESC~);
-        $c->execute(($luts, @cid) x 3, @luts3);
-    } elsif ($is_team) {
-        $c = $dbh->prepare(qq~
-            SELECT
-                $console_select{run}
-                WHERE $need_update{run} AND
-                    C.id=? AND CA.is_hidden=0 AND
-                    (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
-            UNION
-            SELECT
-                $console_select{question}
-                FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                WHERE $need_update{question} AND
-                    Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
-            UNION
-            SELECT
-                $console_select{message}
-                FROM messages M, contest_accounts CA, dummy_table D, accounts A 
-                WHERE $need_update{message} AND
-                    M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
-            $broadcast
-            $contest_start_finish
-            ORDER BY 2 DESC~);
-        $c->execute(($luts, $cid, $uid) x 3, @luts3);
-    } else {
-        $c = $dbh->prepare(qq~
-            SELECT
-                $console_select{run}
-                WHERE $need_update{run} AND
-                    R.contest_id=? AND CA.is_hidden=0 AND 
-                    (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
-            $broadcast
-            $contest_start_finish
-            ORDER BY 2 DESC~);
-        $c->execute($luts, $cid, @luts3);
-    }
-    
-    my (@submission, @contests, @messages);
-    my @rtype_ref = (\@submission, \@messages, \@messages, \@messages, \@contests, \@contests);
-    
-    my ($problems, $teams) = ({}, {});
-        
-    my %alias_link = (
-        submit_state => 'state_or_official',
-        is_official => 'state_or_official',
-        problem_id => 'pid_or_clarified',
-        clarified => 'pid_or_clarified',
-        answer => 'jury_message',
-        message => 'jury_message',
-        'time' => 'submit_time',
+    my %chrono_time = (
+        run => q~
+            R.submit_time
+        ~,
+        question => q~
+            Q.submit_time
+        ~,
+        message => q~
+            M.send_time
+        ~,
+        broadcast => q~
+            M.send_time
+        ~,
+        contest_start => q~
+            C.start_date
+        ~,
+        contest_finish => q~
+            C.start_date
+        ~,
     );
+    
+    $self->{var}->{$_} ||= [] for qw~between and after~;
+    my @reqs = (
+        map( {
+            {
+                between => $self->{var}->{between}->[$_],
+                'and' => $self->{var}->{'and'}->[$_],
+                r_type => 'between',
+            }    
+        } 0..-1+@{$self->{var}->{'and'}}),
+        map( {
+            {
+                after => $self->{var}->{after}->[$_],
+                r_type => 'after'
+            }
+        } 0..-1+@{$self->{var}->{after}}),
+    );
+        
+        
+    @reqs = ({r_type => 'top'}) if !(0+@reqs); #верхушко консоли
+    
+    #die 0+@{$self->{var}->{'and'}}; ASK:
+    #что за ботва? почему length @{$self->{var}->{'and'}} отличается от 0+...
 
-    while (my $r = $c->fetchrow_hashref) {
-        #$_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
-        @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
+    my %chrono_cond_variant = (
+        after => { map { $_ => "$chrono_time{$_} > ?" } keys %chrono_time },
+        between => { map { $_ => "$chrono_time{$_} BETWEEN ? AND ?" } keys %chrono_time },
+        top => { map { $_ => "" } keys %chrono_time },
+    );
+    
+    my ($problems, $teams, $res_seq) = ({}, {}, []);
+    
+    for (@reqs) {
+        my %chrono_cond = %{ $chrono_cond_variant{$_->{r_type}} };
+        my $contest_start_finish = '';
+        my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
+        $contest_start_finish = qq~
+            UNION
+            SELECT
+                $console_select{contest_start}
+                WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+            UNION
+            SELECT
+                $console_select{contest_finish}
+                WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
+        ~;
         
-        my %current_row = ();
-        my $add_row = sub {
-            my $param = shift;
-            $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
-        };
+        my $broadcast = qq~
+            UNION
+            SELECT
+                $console_select{broadcast}
+                WHERE $need_update{broadcast} AND M.broadcast = 1~;
+        my $c;
+        my $luts = $self->{var}->{last_update_timestamp};
+        my @luts3 = ($luts) x 3;
+        if ($is_jury) {
+            my $runs_filter = $is_root ? '' : ' AND C.id = ?';
+            my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
+            my @cid = $is_root ? () : ($cid);
+            $c = $dbh->prepare(qq~
+                SELECT
+                    $console_select{run}
+                    WHERE $need_update{run} $runs_filter
+                UNION
+                SELECT
+                    $console_select{question}
+                    FROM questions Q, contest_accounts CA, dummy_table D, accounts A
+                    WHERE $need_update{question} AND
+                    Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
+                UNION
+                SELECT
+                    $console_select{message}
+                    FROM messages M, contest_accounts CA, dummy_table D, accounts A
+                    WHERE $need_update{message} AND
+                    M.account_id = CA.id AND A.id = CA.account_id$msg_filter
+                $broadcast
+                $contest_start_finish
+                ORDER BY 2 DESC~);
+            $c->execute(($luts, @cid) x 3, @luts3);
+        } elsif ($is_team) {
+            $c = $dbh->prepare(qq~
+                SELECT
+                    $console_select{run}
+                    WHERE $need_update{run} AND
+                        C.id=? AND CA.is_hidden=0 AND
+                        (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                UNION
+                SELECT
+                    $console_select{question}
+                    FROM questions Q, contest_accounts CA, dummy_table D, accounts A
+                    WHERE $need_update{question} AND
+                        Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+                UNION
+                SELECT
+                    $console_select{message}
+                    FROM messages M, contest_accounts CA, dummy_table D, accounts A 
+                    WHERE $need_update{message} AND
+                        M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+                $broadcast
+                $contest_start_finish
+                ORDER BY 2 DESC~);
+            $c->execute(($luts, $cid, $uid) x 3, @luts3);
+        } else {
+            $c = $dbh->prepare(qq~
+                SELECT
+                    $console_select{run}
+                    WHERE $need_update{run} AND
+                        R.contest_id=? AND CA.is_hidden=0 AND 
+                        (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                $broadcast
+                $contest_start_finish
+                ORDER BY 2 DESC~);
+            $c->execute($luts, $cid, @luts3);
+        }
+         
+        my (@submission, @contests, @messages);
+        my @rtype_ref = (\@submission, \@messages, \@messages, \@messages, \@contests, \@contests);
         
-        $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
+        my %alias_link = (
+            submit_state => 'state_or_official',
+            is_official => 'state_or_official',
+            problem_id => 'pid_or_clarified',
+            clarified => 'pid_or_clarified',
+            answer => 'jury_message',
+            message => 'jury_message',
+            'time' => 'submit_time',
+        );
+    
+        while (my $r = $c->fetchrow_hashref) {
+            #$_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
+            @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
             
-        $current_row{rtype} = --$r->{rtype};
-        $current_row{title} = $r->{title} if $r->{rtype} >= $cons_contest_start;
-        
-        !$r->{rtype} and $add_row->($_) for qw/problem_id/;
-        $r->{rtype} == $cons_question and $add_row->($_) for qw/answer clarified/;
-        $r->{rtype} >= $cons_message and $add_row->($_) for qw/message/;
-        $r->{rtype} >= $cons_contest_start and $add_row->($_) for qw/is_official/;
-        
-        my $rss = $r->{$alias_link{submit_state}}; #alias
-        $current_row{submit_state} = 
-            # security: во время соревноваиня не показываем участникам
-            # конкретные результаты других команд, а только accepted/rejected
-            !$r->{rtype} ?
-                ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
-                $rss > $cats::request_processed  && $rss != $cats::st_accepted &&
-                (!$is_team || !$r->{team_id} || $r->{team_id} != $uid)) && !$self->{var}->{contest}->{ctype} ?
-                    $cats::st_rejected
+            my %current_row = ();
+            my $add_row = sub {
+                my $param = shift;
+                $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
+            };
+             
+            $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
+                
+            $current_row{rtype} = --$r->{rtype};
+            $current_row{title} = $r->{title} if $r->{rtype} >= $cons_contest_start;
+            
+            !$r->{rtype} and $add_row->($_) for qw/problem_id/;
+            $r->{rtype} == $cons_question and $add_row->($_) for qw/answer clarified/;
+            $r->{rtype} >= $cons_message and $add_row->($_) for qw/message/;
+            $r->{rtype} >= $cons_contest_start and $add_row->($_) for qw/is_official/;
+            
+            my $rss = $r->{$alias_link{submit_state}}; #alias
+            $current_row{submit_state} = 
+                # security: во время соревноваиня не показываем участникам
+                # конкретные результаты других команд, а только accepted/rejected
+                !$r->{rtype} ?
+                    ($contest->{time_since_defreeze} <= 0 && !$is_jury &&
+                    $rss > $cats::request_processed  && $rss != $cats::st_accepted &&
+                    (!$is_team || !$r->{team_id} || $r->{team_id} != $uid)) && !$self->{var}->{contest}->{ctype} ?
+                        $cats::st_rejected
+                    :
+                        $rss
                 :
-                    $rss
-            :
-                undef;
-        $self->{var}->{is_jury} and $add_row->($_) for qw/last_ip last_ip_short/;
-        $self->{var}->{is_root} and $add_row->($_) for qw/contest_id/;
-        
-        $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified} && $r->{title};
-        $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
-        
-        !defined $current_row{$_} || $current_row{$_} eq '' and delete $current_row{$_} for keys %current_row;
-        $_ =~ /^\d{1,9}$/ and $_ = 0 + $_ for values %current_row; #cast to int type
-        
-        push @{$rtype_ref[$r->{rtype}]}, \%current_row;
+                    undef;
+            $self->{var}->{is_jury} and $add_row->($_) for qw/last_ip last_ip_short/;
+            $self->{var}->{is_root} and $add_row->($_) for qw/contest_id/;
+            
+            $problems->{$r->{pid_or_clarified}} = $r->{title} if $r->{pid_or_clarified} && $r->{title};
+            $teams->{$r->{team_id}} = $r->{team_name} if $r->{team_id};
+            
+            !defined $current_row{$_} || $current_row{$_} eq '' and delete $current_row{$_} for keys %current_row;
+            $_ =~ /^\d{1,9}$/ and $_ = 0 + $_ for values %current_row; #cast to int type
+            
+            push @{$rtype_ref[$r->{rtype}]}, \%current_row;
+        }
+        push (@{$res_seq}, {
+           'submissions' => \@submission,
+           'contests' => \@contests,
+           'messages'=> \@messages,
+           'r_type' => $_->{r_type},
+           'time' => $_->{$_->{r_type}},
+       });
     }
     
-    $self->set_specific_param('submissions', \@submission);
-    $self->set_specific_param('contests', \@contests);
-    $self->set_specific_param('messages', \@messages);
+    $self->set_specific_param('fragments', $res_seq);
     $self->set_specific_param('problems', $problems);
-    
     $self->set_specific_param('teams', $teams);
 }
 
