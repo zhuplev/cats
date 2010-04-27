@@ -17,13 +17,24 @@ sub required_json_params {
 }
 
 
-sub data_validate {
-    my $self = shift;
-    $self->{var}->{last_update_timestamp} =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
+sub optional_json_params {
+    return qw~between and after~;
+}
+
+
+sub timestamp_validate {
+    my ($self, $param_name) = @_;
+    $self->{var}->{$param_name} =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     eval {
         timelocal($6, $5, $4, $3, $2, $1);
         1;
-    } or die 'invalid_last_update_timestamp';
+    } or die "invalid $param_name";
+}
+
+
+sub data_validate {
+    my $self = shift;
+    $self->timestamp_validate('last_update_timestamp');
 }
 
 my ($cons_run, $cons_question, $cons_message, $cons_broadcast, $cons_contest_start, $cons_contest_finish) = (0..5);
@@ -167,7 +178,7 @@ sub make_response {
         ~,
     );
     $_ = sprintf($_, " >= ?") for values %need_update;
-
+    
     my $contest_start_finish = '';
     my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
     $contest_start_finish = qq~
