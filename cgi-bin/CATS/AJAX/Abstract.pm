@@ -8,6 +8,8 @@ use CATS::Constants;
 
 sub required_json_params {};
 
+sub optional_json_params {};
+
 sub data_validate {};
 
 sub make_response {};
@@ -34,11 +36,13 @@ sub new {
         }
         for ($self->required_json_params) {
             my $arg = $self->{json}->{$_};
-                die sprintf "%s param is undef but it's required", $_ unless defined $arg;
+            die sprintf "%s param is undef but it's required", $_ unless defined $arg;
             $self->{var}->{$_} = $arg;
             #также сохраняем переменные, имена которых указаны в our sub @required_json_params в наследуемом классе из JSON,
             #переданного в параметр 'request' запроса
         }
+        
+        $self->{var}->{$_} = $self->{json}->{$_} for $self->optional_json_params;
         
         $self->check_permissions;
         $self->data_validate;
