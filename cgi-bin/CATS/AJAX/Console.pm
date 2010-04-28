@@ -18,17 +18,17 @@ sub required_json_params {
 
 
 sub optional_json_params {
-    return qw~between and after~;
+    return qw~fragments~;
 }
 
 
 sub timestamp_validate {
-    my ($self, $value) = @_;
+    my ($self, $value, $msg) = @_;
     $value =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     eval {
         timelocal($6, $5, $4, $3, $2, $1);
         1;
-    } or die "invalid value: $value";
+    } or die "invalid value: '$value' " . ($msg || '');
 }
 
 
@@ -41,34 +41,28 @@ sub var_timestamp_validate {
 }
 
 
-sub array_timestamp_validate {
-    my ($self, $arr_ref) = @_;
-    $self->timestamp_validate($_) for @{$arr_ref};
-}
-
-
 sub data_validate {
-    no strict; #Это может быть не хорошо, но пока так
     my $self = shift;
     $self->var_timestamp_validate('last_update_timestamp');
-    for (qw~between and after~) {
-        ${$_} = \$self->{var}->{$_};
-        undef $${$_} if ref $${$_} ne 'ARRAY';
-    }
-    
-    defined($$between) ^ defined($$and) and die
-        "Unknown request type: 'between' and 'and' arrays are expected together, but only one of them has found";
-    
-    if (defined($$between) && defined($$and)) {
-        @{$$between} == @{$$and} or die "'between' and 'and' have different lenghts";
-        $self->array_timestamp_validate($${$_}) for qw~between and~;
-    }
-    if (defined $$after) {
-        $self->array_timestamp_validate($${$_}) for qw~after~;
+    for (@{$self->{var}->{fragments}}) {
+        $_->{type} =~ /^(top|between|after)$/ or die "Unknown request type: '$_->{type}'";
+        if ($1 eq 'between') {
+            $_->{l} =~ /^(t|e)$/ or die "Unknown request 'less' param: '$_->{l}'"; #lt | le
+            $_->{g} =~ /^(t|e)$/ or die "Unknown request 'greater' param: '$_->{g}'"; #gt | ge
+            $self->timestamp_validate($_->{between}, "as 'between' param");
+            $self->timestamp_validate($_->{'and'},  "as 'and' param");
+            $_->{between} le $_->{'and'} or die "'between' param is allowed to be greater than 'and' param";
+        }
+        if ($1 eq 'after') {
+            $_->{g} =~ /^(t|e)$/ or die "Unknown request greater param: '$_->{l}'"; #gt | ge
+            $self->timestamp_validate($_->{after},  "as 'after' param");
+        }
     }
 }
 
+
 my ($cons_run, $cons_question, $cons_message, $cons_broadcast, $cons_contest_start, $cons_contest_finish) = (0..5);
+
 
 sub make_response {
     my $self = shift;
@@ -232,39 +226,16 @@ sub make_response {
         ~,
     );
     
-    $self->{var}->{$_} ||= [] for qw~between and after~;
-    my @reqs = (
-        map( {
-            {
-                between => $self->{var}->{between}->[$_],
-                'and' => $self->{var}->{'and'}->[$_],
-                r_type => 'between',
-            }    
-        } 0..-1+@{$self->{var}->{'and'}}),
-        map( {
-            {
-                after => $self->{var}->{after}->[$_],
-                r_type => 'after'
-            }
-        } 0..-1+@{$self->{var}->{after}}),
-    );
-        
-        
-    @reqs = ({r_type => 'top'}) if !(0+@reqs); #верхушко консоли
-    
-    #die 0+@{$self->{var}->{'and'}}; ASK:
-    #что за ботва? почему length @{$self->{var}->{'and'}} отличается от 0+...
-
     my %chrono_cond_variant = (
-        after => { map { $_ => "$chrono_time{$_} > ?" } keys %chrono_time },
-        between => { map { $_ => "$chrono_time{$_} BETWEEN ? AND ?" } keys %chrono_time },
+        after => { map { $_ => "($chrono_time{$_} %s ?)" } keys %chrono_time },
+        between => { map { $_ => "($chrono_time{$_} %s ? AND $chrono_time{$_} %s ?)" } keys %chrono_time },
         top => { map { $_ => "" } keys %chrono_time },
     );
     
     my ($problems, $teams, $res_seq) = ({}, {}, []);
     
-    for (@reqs) {
-        my %chrono_cond = %{ $chrono_cond_variant{$_->{r_type}} };
+    for (@{$self->{var}->{fragments}}) {
+        my %chrono_cond = %{ $chrono_cond_variant{$_->{type}} };
         my $contest_start_finish = '';
         my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
         $contest_start_finish = qq~
@@ -407,7 +378,7 @@ sub make_response {
            'submissions' => \@submission,
            'contests' => \@contests,
            'messages'=> \@messages,
-           'r_type' => $_->{r_type},
+           'type' => $_->{r_type},
            'time' => $_->{$_->{r_type}},
        });
     }
