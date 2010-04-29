@@ -45,7 +45,7 @@ sub data_validate {
     my $self = shift;
     $self->var_timestamp_validate('last_update_timestamp');
     for (@{$self->{var}->{fragments}}) {
-        $_->{type} =~ /^(top|between|after)$/ or die "Unknown request type: '$_->{type}'";
+        $_->{type} =~ /^(top|between|before)$/ or die "Unknown request type: '$_->{type}'";
         if ($1 eq 'between') {
             $_->{l} =~ /^(t|e)$/ or die "Unknown request 'less' param: '$_->{l}'"; #lt | le
             $_->{g} =~ /^(t|e)$/ or die "Unknown request 'greater' param: '$_->{g}'"; #gt | ge
@@ -53,9 +53,9 @@ sub data_validate {
             $self->timestamp_validate($_->{'and'},  "as 'and' param");
             $_->{between} le $_->{'and'} or die "'between' param is allowed to be greater than 'and' param";
         }
-        if ($1 eq 'after') {
+        if ($1 eq 'before') {
             $_->{l} =~ /^(t|e)$/ or die "Unknown request less param: '$_->{l}'"; #lt | le
-            $self->timestamp_validate($_->{after},  "as 'after' param");
+            $self->timestamp_validate($_->{before},  "as 'before' param");
         }
         $_->{length} and ($_->{length} =~ /^\d{1,3}+$/ or die "Invalid 'length' param: '$_->{length}'");
         $_->{length} > 0 and $_->{length} <= $cats::max_fragment_row_count or $_->{length} = $cats::max_fragment_row_count;
@@ -229,7 +229,7 @@ sub make_response {
     );
     
     my %fragment_cond_variant = (
-        after => { map { $_ => "($fragment_time{$_} <%s ?)" } keys %fragment_time },
+        before => { map { $_ => "($fragment_time{$_} <%s ?)" } keys %fragment_time },
         between => { map { $_ => "($fragment_time{$_} <%s ? AND $fragment_time{$_} >%s ?)" } keys %fragment_time },
         top => { map { $_ => "" } keys %fragment_time },
     );
@@ -241,12 +241,13 @@ sub make_response {
         my $v = $_;
         my ($l, $g) = (map $v->{$_} eq 'e' ? '=' : '', qw~l g~);
         my %fragment_cond_sprintf_params = (
-            after => [$l],
+            before => [$l],
             between => [$l, $g],
             top => [],
         );
         my @fragment_cond_sprintf_params = @{$fragment_cond_sprintf_params{$_->{type}}};
         $_ = sprintf $_, @fragment_cond_sprintf_params for values %fragment_cond;
+        die %fragment_cond;
         my $contest_start_finish = '';
         my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
         $contest_start_finish = qq~
