@@ -53,6 +53,16 @@ String.format = function() {
 }
 
 
+String.min = function(a, b) {
+    return a < b ? a : b;
+}
+
+
+String.max = function(a, b) {
+    return a > b ? a : b;
+}
+
+
 Object.size = function(obj) {
     var size = 0;
     for (var key in obj) {
