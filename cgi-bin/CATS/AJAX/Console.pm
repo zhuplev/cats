@@ -12,8 +12,8 @@ use Encode;
 our @ISA = qw~CATS::AJAX::Abstract~;
 
 
-sub required_json_params {
-    return qw~last_update_timestamp~;
+sub required_json_params { #deprecated
+    return qw~~;
 }
 
 
@@ -32,7 +32,7 @@ sub timestamp_validate {
 }
 
 
-sub var_timestamp_validate {
+sub var_timestamp_validate { #deprecated
     my ($self, $param_name) = @_;
     eval {
         $self->timestamp_validate($self->{var}->{$param_name});
@@ -43,8 +43,8 @@ sub var_timestamp_validate {
 
 sub data_validate {
     my $self = shift;
-    $self->var_timestamp_validate('last_update_timestamp');
     for (@{$self->{var}->{fragments}}) {
+        $self->timestamp_validate($_->{last_update_timestamp});
         $_->{type} =~ /^(top|between|before)$/ or die "Unknown request type: '$_->{type}'";
         if ($1 eq 'between') {
             $_->{l} =~ /^(t|e)$/ or die "Unknown request 'less' param: '$_->{l}'"; #lt | le
@@ -247,7 +247,6 @@ sub make_response {
         );
         my @fragment_cond_sprintf_params = @{$fragment_cond_sprintf_params{$_->{type}}};
         $_ = sprintf $_, @fragment_cond_sprintf_params for values %fragment_cond;
-        die %fragment_cond;
         my $contest_start_finish = '';
         my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
         $contest_start_finish = qq~
@@ -267,7 +266,7 @@ sub make_response {
                 $console_select{broadcast}
                 WHERE $need_update{broadcast} AND M.broadcast = 1~;
         my $c;
-        my $luts = $self->{var}->{last_update_timestamp};
+        my $luts = $_->{last_update_timestamp};
         my $length = $_->{length};
         my @length_and_luts3 = ($length, $luts) x 3;
         if ($is_jury) {
