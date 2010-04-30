@@ -8,6 +8,7 @@ const DataConsoleAtom = {
 
 
 const DataConsoleDateInf = '9';
+const DataConsoleDateNegInf = '0';
 
 
 const DataConsole = $.inherit(
@@ -81,11 +82,7 @@ const DataConsoleFragment = $.inherit(
             this.reset();
             
             if (!defined(this.since)) {
-                var currSince = DataConsoleDateInf;
-                for (var i in s) {currSince = String.min(currSince, s[i])};
-                for (var i in m) {currSince = String.min(currSince, m[i])};
-                for (var i in c) {currSince = String.min(currSince, c[i])};
-                this.since = currSince;
+                this.getSince();
             }
             //фрагмент, который пришёл после прокрутки куда-то вниз, когда нам указали только верхнюю временную границу
             
@@ -93,6 +90,20 @@ const DataConsoleFragment = $.inherit(
                 this.to = DataConsoleDateInf;
             }
             //top console
+        },
+        
+        getSince : function() {
+            this.since = DataConsoleDateInf;
+            if (this.s.length > 0) {this.since = String.min(this.since, s[0].time)};
+            if (this.m.length > 0) {this.since = String.min(this.since, m[0].time)};
+            if (this.c.length > 0) {this.since = String.min(this.since, c[0].time)};
+        },
+        
+        getTo : function() {
+            this.since = DataConsoleDateNegInf;
+            if (this.s.length > 0) {this.since = String.max(this.since, s[this.s.length - 1].time)};
+            if (this.m.length > 0) {this.since = String.max(this.since, m[this.s.length - 1].time)};
+            if (this.c.length > 0) {this.since = String.max(this.since, c[this.s.length - 1].time)};
         },
         
         reset : function() {
@@ -151,6 +162,18 @@ const DataConsoleFragmentsSequence = $.inherit(
             this.reqs = [];
         },
         
+        binSearchFragment: function(time, l, r) {
+            while (l+1 < r) {
+                var q = Math.floor((l + r) / 2);
+                if (this.seq[q].since <= time) {
+                    l = q;
+                } else {
+                    r = q;
+                }
+            }
+            return l;
+        }
+        
         findNearestFragment: function(time) {
             var l = 0;
             var r = this.seq.length - 1;
@@ -161,16 +184,8 @@ const DataConsoleFragmentsSequence = $.inherit(
             //т.к. большинство запросов будут приходиться на top консоли,
             //проверяем, не нужно ли выдать top фрагмент
             r--;
-            while (l+1 < r) {
-                var q = Math.floor((l + r) / 2);
-                if (this.seq[q].since <= time) {
-                    l = q;
-                } else {
-                    r = q;
-                }
-            }
+            r = this.binSearchFragment(time, l, r);
             //ну а иначе --- поиск ближайшего (в сторону убывания даты) фрагмента бинарным поиском
-            r = l;
             //здесь r имеет смысл номера правого фрагмента, покрывающего наш запрос,
             //это как раз тот l который мы нашли: ближайщий, имеющий слева since
             if (this.seq[r].to < time) {
