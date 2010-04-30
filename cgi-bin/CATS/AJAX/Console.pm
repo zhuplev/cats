@@ -58,6 +58,7 @@ sub data_validate {
             $self->timestamp_validate($_->{before},  "as 'before' param");
         }
         $_->{length} and ($_->{length} =~ /^\d{1,3}+$/ or die "Invalid 'length' param: '$_->{length}'");
+        $_->{length} ||= 0;
         $_->{length} > 0 and $_->{length} <= $cats::max_fragment_row_count or $_->{length} = $cats::max_fragment_row_count;
     }
 }
@@ -387,9 +388,9 @@ sub make_response {
             push @{$rtype_ref[$r->{rtype}]}, \%current_row;
         }
         push (@{$res_seq}, {
-           'submissions' => \@submission,
-           'contests' => \@contests,
-           'messages'=> \@messages,
+           'submissions' => [reverse @submission],
+           'contests' => [reverse @contests],
+           'messages'=> [reverse @messages],
            'type' => $_->{type},
            'time' => $_->{$_->{type}},
        });
