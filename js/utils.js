@@ -72,6 +72,20 @@ Array.prototype.append = function(a, b) {
 }
 
 
+Array.prototype.insertAfter = function(list, num, elem) {
+    var result = list;
+    result.push(undefined);
+    var i = result.length - 1;
+    num++;
+    while (i > num) {
+        result[i] = result[i-1];
+        i--;
+    }
+    result[i] = elem;
+    return result;
+}
+
+
 Object.size = function(obj) {
     var size = 0;
     for (var key in obj) {
