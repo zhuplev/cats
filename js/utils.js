@@ -63,6 +63,15 @@ String.max = function(a, b) {
 }
 
 
+Array.prototype.append = function(a, b) {
+    var result = a;
+    for (var i in b) {
+        result.push(b[i]);
+    }
+    return result;
+}
+
+
 Object.size = function(obj) {
     var size = 0;
     for (var key in obj) {
