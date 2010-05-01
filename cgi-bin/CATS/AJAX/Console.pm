@@ -26,7 +26,7 @@ sub timestamp_validate {
     my ($self, $value, $msg) = @_;
     $value =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     eval {
-        timelocal($6, $5, $4, $3, $2, $1);
+        timelocal($6, $5, $4, $3, $2-1, $1);
         1;
     } or die "invalid value: '$value' " . ($msg || '');
 }
@@ -116,8 +116,8 @@ sub make_response {
         run => q~
             1 AS rtype,
             R.submit_time AS rank,
-            CATS_DATE(R.submit_time) AS submit_time,
-            CATS_DATE(R.result_time) AS last_console_update,
+            R.submit_time AS submit_time,
+            R.result_time AS last_console_update,
             R.id AS id,
             R.state AS state_or_official,
             R.failed_test AS failed_test,
@@ -139,8 +139,8 @@ sub make_response {
         question => q~
             2 AS rtype,
             Q.submit_time AS rank,
-            CATS_DATE(Q.submit_time) AS submit_time,
-            CATS_DATE(COALESCE(Q.clarification_time, Q.submit_time)) AS last_console_update,
+            Q.submit_time AS submit_time,
+            COALESCE(Q.clarification_time, Q.submit_time) AS last_console_update,
             Q.id AS id,
             CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -155,8 +155,8 @@ sub make_response {
         message => q~
             3 AS rtype,
             M.send_time AS rank,
-            CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.send_time) AS last_console_update,
+            M.send_time AS submit_time,
+            M.send_time AS last_console_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -172,8 +172,8 @@ sub make_response {
         broadcast => qq~
             4 AS rtype,
             M.send_time AS rank,
-            CATS_DATE(M.send_time) AS submit_time,
-            CATS_DATE(M.send_time) AS last_console_update,
+            M.send_time AS submit_time,
+            M.send_time AS last_console_update,
             M.id AS id,
             CAST(NULL AS INTEGER) AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -187,8 +187,8 @@ sub make_response {
         contest_start => qq~
             5 AS rtype,
             C.start_date AS rank,
-            CATS_DATE(C.start_date) AS submit_time,
-            CATS_DATE(C.start_date) AS last_console_update,
+            C.start_date AS submit_time,
+            C.start_date AS last_console_update,
             C.id AS id,
             C.is_official AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -202,8 +202,8 @@ sub make_response {
         contest_finish => qq~
             6 AS rtype,
             C.finish_date AS rank,
-            CATS_DATE(C.finish_date) AS submit_time,
-            CATS_DATE(C.finish_date) AS last_console_update,
+            C.finish_date AS submit_time,
+            C.finish_date AS last_console_update,
             C.id AS id,
             C.is_official AS state_or_official,
             CAST(NULL AS INTEGER) AS failed_test,
@@ -258,7 +258,7 @@ sub make_response {
             C.start_date
         ~,
         contest_finish => q~
-            C.start_date
+            C.finish_date
         ~,
     );
     my %fragment_cond_variant = (
@@ -297,7 +297,7 @@ sub make_response {
             my ($kv) = @_;
             my %v = (
                 'before' => [$kv->{to}],
-                'between' => [$kv->{to}, $kv->{since}],
+                'between' => [$kv->{since}, $kv->{to}],
                 'top' => [],
                 'none' => [],
             );
@@ -312,66 +312,86 @@ sub make_response {
         my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
         $contest_start_finish = qq~
             UNION
-            SELECT
+            SELECT * FROM ( SELECT
                 $console_select{contest_start}
                 WHERE $cc->{contest_start} $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+                ORDER BY 2 DESC
+            )
             UNION
-            SELECT
+            SELECT * FROM ( SELECT
                 $console_select{contest_finish}
                 WHERE $cc->{contest_finish} $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
+                ORDER BY 2 DESC
+            )
         ~;
         
         my $broadcast = qq~
             UNION
-            SELECT
+            SELECT * FROM ( SELECT
                 $console_select{broadcast}
-                WHERE $mc->{broadcast} $need_update{broadcast} AND M.broadcast = 1~;
+                WHERE $mc->{broadcast} $need_update{broadcast} AND M.broadcast = 1
+                ORDER BY 2 DESC
+            )
+        ~;
         my $dtst;
-        my ($lutss, $lengths, $lutsc, $lengthc, $lutsm, $lengthm) = map {$k{$_}->{last_update_timestamp}, $k{$_}->{length}} @kinds;
-        my @bcp = ($lengthm, $lutsm, @mp, ($lengthc, $lutsc, @cp) x 2);
+        my ($lutss, $lengths, $lutsc, $lengthc, $lutsm, $lengthm) = map {$k{$_}->{last_update_timestamp}, $k{$_}->{length}+1} @kinds;
+        my %length = map {$_ => $k{$_}->{length}} @kinds;
+        my @bcp = ($lengthm, @mp, $lutsm, ($lengthc, @cp, $lutsc) x 2);
         if ($is_jury) {
             my $runs_filter = $is_root ? '' : ' AND C.id = ?';
             my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
             my @cid = $is_root ? () : ($cid);
             $dtst = $dbh->prepare(qq~
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{run}
                     WHERE $sc->{run} $need_update{run} $runs_filter
+                    ORDER BY 2 DESC
+                )
                 UNION
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{question}
                     FROM questions Q, contest_accounts CA, dummy_table D, accounts A
                     WHERE $mc->{question} $need_update{question} AND
                     Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
+                    ORDER BY 2 DESC
+                )
                 UNION
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{message}
                     FROM messages M, contest_accounts CA, dummy_table D, accounts A
                     WHERE $mc->{message} $need_update{message} AND
                     M.account_id = CA.id AND A.id = CA.account_id$msg_filter
+                    ORDER BY 2 DESC
+                )
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
             $dtst->execute($lengths, @sp, $lutss, @cid, ($lengthm, @mp, $lutsm, @cid) x 2, @bcp);
         } elsif ($is_team) {
             $dtst = $dbh->prepare(qq~
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{run}
                     WHERE $sc->{run} $need_update{run} AND
                         C.id=? AND CA.is_hidden=0 AND
                         (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                    ORDER BY 2 DESC
+                )
                 UNION
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{question}
                     FROM questions Q, contest_accounts CA, dummy_table D, accounts A
                     WHERE $mc->{question} $need_update{question} AND
                         Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+                    ORDER BY 2 DESC
+                )
                 UNION
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{message}
                     FROM messages M, contest_accounts CA, dummy_table D, accounts A 
                     WHERE $mc->{message} $need_update{message} AND
                         M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
+                    ORDER BY 2 DESC
+                )
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
@@ -383,6 +403,8 @@ sub make_response {
                     WHERE $sc->{run} $need_update{run} AND
                         R.contest_id=? AND CA.is_hidden=0 AND 
                         (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
+                    ORDER BY 2 DESC
+                )
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
@@ -453,6 +475,13 @@ sub make_response {
             'contests' => [reverse @contests],
             'messages'=> [reverse @messages],
         };
+        for (@kinds) {
+            #если длина куска = length+1 -- обрезаем время since по времени того, который нам нужен =)
+            if (@{$ans->{$_}} > $length{$_}) { #ASK: length?
+                shift @{$ans->{$_}} while @{$ans->{$_}} > $length{$_};
+                $k{$_}->{since} = $ans->{$_}->[0]->{time},
+            }
+        }
         {
             no warnings 'uninitialized';
             for (map({
