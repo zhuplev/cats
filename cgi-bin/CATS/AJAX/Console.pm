@@ -430,10 +430,11 @@ sub make_response {
             
             my %current_row = ();
             my $add_row = sub {
+                no warnings 'uninitialized';
                 my $param = shift;
                 $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
             };
-            {
+           {
                 no warnings 'uninitialized';
                 $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
             }    
@@ -491,7 +492,7 @@ sub make_response {
                 'since' => $k{$_}->{since},
                 'to' => $k{$_}->{to},
             }, @kinds)) {
-                push (@{$res_seq}, $_) if $_->{type} ne 'none';
+                push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$ans->{$_}};
             }
         }
         $i++;
