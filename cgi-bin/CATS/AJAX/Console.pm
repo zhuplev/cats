@@ -52,11 +52,12 @@ sub timestamp_change {
     my $q = $msec + $d;
     if ($msec + $d < 0 || $msec + $d > 10000) {
         ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(timelocal($sec, $min, $hour, $mday, $mon, $year) + $d);
+        $year += 1900;
         $msec = (10000 * 10000 + $d) % 10000;
     } else {
         $msec += $d;
     }
-    $timestamp = sprintf $timestamp_format, $year+1900, $mon, $mday, $hour, $min, $sec, $msec;
+    $timestamp = sprintf $timestamp_format, $year, $mon, $mday, $hour, $min, $sec, $msec;
     return $timestamp;
 
 }
