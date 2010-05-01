@@ -74,171 +74,111 @@ const DataConsole = $.inherit(
  
 const DataConsoleFragment = $.inherit(
     {
-        __constructor : function(since, to, s, m, c, tmstmp) {
+        __constructor : function(dataType, since, to, seq) {
+            this.dataType = dataType;
             this.since = since;
             this.to = to;
-            this.s = s; this.m = m; this.c = c; //submissions, messages, contests
-            this.timestamp = tmstmp;
-            this.reset();
-            
-            if (!defined(this.since)) {
-                this.getSince();
+            this.seq = seq;
+            if (!defined(since)) {
+                this.since = seq[0].time;
             }
-            //фрагмент, который пришёл после прокрутки куда-то вниз, когда нам указали только верхнюю временную границу
-            
-            if (!defined(this.to)) {
-                this.to = DataConsoleDateInf;
+            if (!defined(to)) {
+                since.to = DataConsoleDateInf;
             }
-            //top console
+            this.length = seq.length;
+            this.i = 0;
         },
         
-        getSince : function() {
-            this.since = DataConsoleDateInf;
-            if (this.s.length > 0) {this.since = String.min(this.since, s[0].time)};
-            if (this.m.length > 0) {this.since = String.min(this.since, m[0].time)};
-            if (this.c.length > 0) {this.since = String.min(this.since, c[0].time)};
+        setBegin : function() {
+            this.i = this.length;
         },
         
-        getTo : function() {
-            this.since = DataConsoleDateNegInf;
-            if (this.s.length > 0) {this.since = String.max(this.since, s[this.s.length - 1].time)};
-            if (this.m.length > 0) {this.since = String.max(this.since, m[this.s.length - 1].time)};
-            if (this.c.length > 0) {this.since = String.max(this.since, c[this.s.length - 1].time)};
+        end : function() { //end-of-fragment
+            return this.i < 0;
         },
         
-        reset : function() {
-            this.sc = 0; this.mc = 0; this.cc = 0; //counters
+        nextLine : function()  {
+            return this.seq[--this.i];
         },
         
-        changeMask : function(mask) { //ASK: setMask?
-            this.mask = mask;
-            this.sl = (this.matchMask(DataConsoleAtom.submission)) * this.s.length;
-            this.ml = (this.matchMask(DataConsoleAtom.message)) * this.m.length;
-            this.cl = (this.matchMask(DataConsoleAtom.contest)) * this.c.length;
-            //Длина фрагмента с учётом наложенной маски.
-            //Очень удобно: когда нужно выдать следующий элемент промежутка
-            //т.к. длины "ненужных" массивов обнулены, поэтому просто пишем "слияние" трёх массивов
-            this.length = this.sl + this.ml + this.cl;
+        currLine : function() {
+            return this.seq[this.i];
         },
         
-        setMask : function(mask) { //ASK: loadMask?
-            this.reset();
-            this.changeMask(mask);
-        },
-        
-        matchMask : function(value) { //ASK: Fishy name.... How can it be named?
-            return value & this.mask != 0 ? 1 : 0;
-        },
-        
-        getNext : function(mask) {
-            var di = DataConsoleDateInf;
-            var s = (this.sc < this.sl ? this.s[this.sc].time : di);
-            var m = (this.mc < this.ml ? this.m[this.mc].time : di);
-            var c = (this.cc < this.cl ? this.c[this.cc].time : di);
-            var result = String.min(String.min(s, m), c); result = (result == di ? undefined : result);
-            if (!defined(result)) {return result;}
-            
-            if (this.s[this.sc].time == result) {return this.s[this.sc++];}
-            else if (this.c[this.cc].time == result) {return this.c[this.cc++];}
-            else if (this.m[this.mc].time == result) {return this.m[this.mc++];}
-            
+        findNear : function(time) {
+            if (this.since > time) {
+                return -2;
+            }
+            if (this.to < time) {
+                return -1
+            }
+            var result = 0;
+            result = this.length;
+            do {
+                result--;
+            } while (this.seq[this.result].time > time);
+            //TODO: написать бинарный поиск!
             return result;
         },
         
-        getWholeFragment : function() {
-            var result = [];
-            for (var i = 0; i < this.length; i++) {
-                result.push(this.getNext());
-            }
-        },
+        toNear : function(time) {
+            this.i = this.findNear();
+        }
     }
 );
 
 
-const DataConsoleFragmentsSequence = $.inherit(
+const DataConsoleFragmentVector = $.inherit(
     {
-        __constructor : function(since, to, s, m, c) {
+        __constructor : function(dataType) {
+            this.dataType = dataType;
+            this.length = -1;
+            this.i = 0;
             this.seq = [];
             this.reqs = [];
         },
         
-        binSearchFragment: function(time, l, r) {
-            while (l+1 < r) {
-                var q = Math.floor((l + r) / 2);
-                if (this.seq[q].since <= time) {
-                    l = q;
-                } else {
-                    r = q;
-                }
+        findNear : function(time) {
+            if (this.seq[0].since > time) {
+                this.reqs.push(new DataConsoleRequest.before(this.dataType, time, true));
+                return -2;
             }
-            return l;
-        }
-        
-        findNearestFragment: function(time) {
-            var l = 0;
-            var r = this.seq.length - 1;
-            
-            if (time >= this.seq[r].since) {
-                return r;
+            //большинство запросов будет на top, поэтому проверим-ка ручками:
+            if (this.seq[this.length-1].since <= time) {
+                return this.length-1;
             }
-            //т.к. большинство запросов будут приходиться на top консоли,
-            //проверяем, не нужно ли выдать top фрагмент
-            r--;
-            r = this.binSearchFragment(time, l, r);
-            //ну а иначе --- поиск ближайшего (в сторону убывания даты) фрагмента бинарным поиском
-            //здесь r имеет смысл номера правого фрагмента, покрывающего наш запрос,
-            //это как раз тот l который мы нашли: ближайщий, имеющий слева since
-            if (this.seq[r].to < time) {
-                reqs.push(new DataConsoleRequest.between(this.seq[r].to, time, false, true));
-                //если попали между фрагментами, имеет смысл спросить данные с конца предыдущего фрагмента по указанное время 
+            var result = 0;
+            while (result < this.length-1 && this.seq[this.result].to < time) {
+                result++;
             }
-            if (r == 0) {
-                if (this.seq[r].since > time) {
-                    reqs.push(new DataConsoleRequest.before(time, true));
-                    //мы попали в самый низкий фрагмент, пытаемся выяснить, что было до него
-                } else {
-                    reqs.push(new DataConsoleRequest.before(this.seq[r].since, false));
-                    //или же мы вообще уехали далеко вниииииииз
-                }
+            if (this.seq[result].since > time) {
+                //между фрагментами:
+                result--;
+                this.reqs.push(new DataConsoleRequest.between(this.dataType, this.seq[result].to, this.seq[result+1].since, false, false));
             }
-            return r;
-        },
-        
-        getLines : function(time, mask, quantity) {
-            var r = this.findNearestFragment(time);
-            var k = 0;
-            this.seq[r].setMask(mask);
-            var result = this.seq[r].getWholeFragment();
-            if (result[0].time >= time) {
-                var i = result.length - 1;
-                while (result[i].time > time) {
-                    result.pop();
-                }
-                //убить всё лишнее с конца
-                while (result.length < quantity) {
-                    this.loaded = false;
-                    r--;
-                    if (r < 0) {
-                        return result;
-                    } else {
-                        reqs.push(new DataConsoleRequest.between(this.seq[r].to, this.seq[r+1].since, false, false));
-                        //может быть что-то есть между уже сохранёнными фрагментами?
-                        var l = this.seq[r].getWholeFragment();
-                        result = l.append(result);
-                    }
-                }
-            }
-        },
-        
-        takeRequests : function() {
-            var result = this.reqs;
-            this.clearRequests();
+            //TODO: написать бинарный поиск!
             return result;
         },
         
-        clearRequests : function() {
-            this.reqs = [];
-        }
+        nextLine : function()  {
+            if (this.seq[this.i].end()) {
+                this.seq[--this.i].setBegin();
+            }
+            return this.seq[this.i].nextLine();
+        },
+        
+        currLine : function() {
+            return this.seq[this.i].currLine();
+        },
+        
+        toNear : function(time) {
+            this.i = this.findNear(time);
+            this.seq[this.i].toNear(time);
+        },
+        
+        end : function() {
+            this.i < 0;
+        },
     }
 );
 
@@ -256,11 +196,12 @@ DataConsoleRequest.abstract = $.inherit(
 DataConsoleRequest.between = $.inherit(
      DataConsoleRequest.abstract,
      {
-        __constructor : function(between, and, ge, le) {
+        __constructor : function(data_type, since, to, ge, le) {
             this.result = {
+                'data_type' : data_type,
                 'type' : 'between',                
-                'between' : between,
-                'and' : and,
+                'since' : since,
+                'to' : to,
                 'l' : (le ? 'e' : 't'),
                 'g' : (ge ? 'e' : 't'),
             };
@@ -271,10 +212,11 @@ DataConsoleRequest.between = $.inherit(
 DataConsoleRequest.before = $.inherit(
      DataConsoleRequest.abstract,
      {
-        __constructor : function(before, le) {
+        __constructor : function(data_type, to, le) {
             this.result = {
+                'data_type' : data_type,
                 'type' : 'before',                
-                'before' : before,
+                'to' : to,
                 'l' : (le ? 'e' : 't'),
             };
         },
@@ -284,8 +226,9 @@ DataConsoleRequest.before = $.inherit(
 DataConsoleRequest.top = $.inherit(
      DataConsoleRequest.abstract,
      {
-        __constructor : function(time, before, le) {
+        __constructor : function(data_type, time, before, le) {
             this.result = {
+                'data_type' : data_type,
                 'type' : 'top',
             };
         },

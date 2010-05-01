@@ -32,6 +32,36 @@ sub timestamp_validate {
 }
 
 
+sub timestamp_increase {
+    my ($self, $timestamp) = @_;
+    return $self->timestamp_change($timestamp, 1);
+}
+
+
+sub timestamp_decrease {
+    my ($self, $timestamp) = @_;
+    return $self->timestamp_change($timestamp, -1);
+}
+
+
+sub timestamp_change {
+    my ($self, $timestamp, $d) = @_;
+    my $timestamp_format = '%0.2d-%0.2d-%0.2d %0.2d:%0.2d:%0.2d.%0.4d';
+    $timestamp =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
+    my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst, $msec) = ($6, $5, $4, $3, $2, $1, undef, undef, undef, $7);
+    my $q = $msec + $d;
+    if ($msec + $d < 0 || $msec + $d > 10000) {
+        ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(timelocal($sec, $min, $hour, $mday, $mon, $year) + $d);
+        $msec = (10000 * 10000 + $d) % 10000;
+    } else {
+        $msec += $d;
+    }
+    $timestamp = sprintf $timestamp_format, $year, $mon, $mday, $hour, $min, $sec, $msec;
+    return $timestamp;
+
+}
+
+
 sub var_timestamp_validate { #deprecated
     my ($self, $param_name) = @_;
     eval {
@@ -43,23 +73,25 @@ sub var_timestamp_validate { #deprecated
 
 sub data_validate {
     my $self = shift;
-    for (@{$self->{var}->{fragments}}) {
-        $self->timestamp_validate($_->{last_update_timestamp});
-        $_->{type} =~ /^(top|between|before)$/ or die "Unknown request type: '$_->{type}'";
-        if ($1 eq 'between') {
-            $_->{l} =~ /^(t|e)$/ or die "Unknown request 'less' param: '$_->{l}'"; #lt | le
-            $_->{g} =~ /^(t|e)$/ or die "Unknown request 'greater' param: '$_->{g}'"; #gt | ge
-            $self->timestamp_validate($_->{between}, "as 'between' param");
-            $self->timestamp_validate($_->{'and'},  "as 'and' param");
-            $_->{between} le $_->{'and'} or die "'between' param is allowed to be greater than 'and' param";
+    for (qw~submissions contests messages~) {
+        for (@{$self->{var}->{fragments}->{$_}}) {
+            $self->timestamp_validate($_->{last_update_timestamp});
+            $_->{type} =~ /^(top|between|before)$/ or die "Unknown request type: '$_->{type}'";
+            if ($1 eq 'between') {
+                $_->{l} =~ /^(t|e)$/ or die "Unknown request 'less' param: '$_->{l}'"; #lt | le
+                $_->{g} =~ /^(t|e)$/ or die "Unknown request 'greater' param: '$_->{g}'"; #gt | ge
+                $self->timestamp_validate($_->{since}, "as 'since' param");
+                $self->timestamp_validate($_->{to},  "as 'to' param");
+                $_->{since} le $_->{to} or die "'since' param is allowed to be greater than 'to' param";
+            }
+            if ($1 eq 'before') {
+                $_->{l} =~ /^(t|e)$/ or die "Unknown request less param: '$_->{l}'"; #lt | le
+                $self->timestamp_validate($_->{to},  "as 'to' param");
+            }
+            $_->{length} and ($_->{length} =~ /^\d{1,3}+$/ or die "Invalid 'length' param: '$_->{length}'");
+            $_->{length} ||= 0;
+            $_->{length} > 0 and $_->{length} <= $cats::max_fragment_row_count or $_->{length} = $cats::max_fragment_row_count;
         }
-        if ($1 eq 'before') {
-            $_->{l} =~ /^(t|e)$/ or die "Unknown request less param: '$_->{l}'"; #lt | le
-            $self->timestamp_validate($_->{before},  "as 'before' param");
-        }
-        $_->{length} and ($_->{length} =~ /^\d{1,3}+$/ or die "Invalid 'length' param: '$_->{length}'");
-        $_->{length} ||= 0;
-        $_->{length} > 0 and $_->{length} <= $cats::max_fragment_row_count or $_->{length} = $cats::max_fragment_row_count;
     }
 }
 
@@ -228,106 +260,132 @@ sub make_response {
             C.start_date
         ~,
     );
-    
     my %fragment_cond_variant = (
-        before => { map { $_ => "($fragment_time{$_} <%s ?)" } keys %fragment_time },
-        between => { map { $_ => "($fragment_time{$_} <%s ? AND $fragment_time{$_} >%s ?)" } keys %fragment_time },
+        before => { map { $_ => "($fragment_time{$_} <= ?) AND" } keys %fragment_time },
+        between => { map { $_ => "($fragment_time{$_} >= ? AND $fragment_time{$_} <= ?) AND" } keys %fragment_time },
         top => { map { $_ => "" } keys %fragment_time },
+        none => { map { $_ => "1 < 0 AND" } keys %fragment_time },
     );
     
     my ($problems, $teams, $res_seq) = ({}, {}, []);
     
-    for (@{$self->{var}->{fragments}}) {
-        my %fragment_cond = %{ $fragment_cond_variant{$_->{type}} };
-        my $v = $_;
-        my ($l, $g) = (map $v->{$_} eq 'e' ? '=' : '', qw~l g~);
-        my %fragment_cond_sprintf_params = (
-            before => [$l],
-            between => [$l, $g],
-            top => [],
-        );
-        my @fragment_cond_sprintf_params = @{$fragment_cond_sprintf_params{$_->{type}}};
-        $_ = sprintf $_, @fragment_cond_sprintf_params for values %fragment_cond;
+    my $i = 0;
+    my $frs = $self->{var}->{fragments};
+    my @kinds = qw~submissions contests messages~;
+    while ($i < @{$frs->{submissions}} || $i < @{$frs->{contests}} || $i < @{$frs->{messages}}) {
+        my %k = map {
+            $_ => $i < @{$frs->{$_}}
+                ? $frs->{$_}->[$i]
+                : {
+                    type => 'none',
+                    last_update_timestamp => '2000-01-01 00:00:00.0000',
+                    length => $cats::max_fragment_row_count,
+                  }
+        } @kinds;
+        my %fragment_cond;
+        for (@kinds) {
+            no warnings 'uninitialized';
+            $fragment_cond{$_} = $fragment_cond_variant{$k{$_}->{type}};
+            $k{$_}->{to} = $self->timestamp_decrease($k{$_}->{to}) if $k{$_}->{l} eq 't';
+            $k{$_}->{since} = $self->timestamp_increase($k{$_}->{since}) if $k{$_}->{g} eq 't';
+        }
+        
+        my ($sc, $cc, $mc) = map $fragment_cond{$_}, @kinds;
+        
+        my $get_params = sub {
+            my ($kv) = @_;
+            my %v = (
+                'before' => [$kv->{to}],
+                'between' => [$kv->{to}, $kv->{since}],
+                'top' => [],
+                'none' => [],
+            );
+            return @{$v{$kv->{type}}};
+        };
+        
+        my @sp = $get_params->($k{submissions});
+        my @cp = $get_params->($k{contests});
+        my @mp = $get_params->($k{messages});
+        
         my $contest_start_finish = '';
         my $hidden_cond = $is_root ? '' : ' AND C.is_hidden = 0';
         $contest_start_finish = qq~
             UNION
             SELECT
                 $console_select{contest_start}
-                WHERE $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
+                WHERE $cc->{contest_start} $need_update{contest_start} AND (C.start_date < CURRENT_TIMESTAMP)$hidden_cond
             UNION
             SELECT
                 $console_select{contest_finish}
-                WHERE $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
+                WHERE $cc->{contest_finish} $need_update{contest_finish} AND (C.finish_date < CURRENT_TIMESTAMP)$hidden_cond
         ~;
         
         my $broadcast = qq~
             UNION
             SELECT
                 $console_select{broadcast}
-                WHERE $need_update{broadcast} AND M.broadcast = 1~;
-        my $c;
-        my $luts = $_->{last_update_timestamp};
-        my $length = $_->{length};
-        my @length_and_luts3 = ($length, $luts) x 3;
+                WHERE $mc->{broadcast} $need_update{broadcast} AND M.broadcast = 1~;
+        my $dtst;
+        my ($lutss, $lengths, $lutsc, $lengthc, $lutsm, $lengthm) = map {$k{$_}->{last_update_timestamp}, $k{$_}->{length}} @kinds;
+        my @bcp = ($lengthm, $lutsm, @mp, ($lengthc, $lutsc, @cp) x 2);
         if ($is_jury) {
             my $runs_filter = $is_root ? '' : ' AND C.id = ?';
             my $msg_filter = $is_root ? '' : ' AND CA.contest_id = ?';
             my @cid = $is_root ? () : ($cid);
-            $c = $dbh->prepare(qq~
+            $dtst = $dbh->prepare(qq~
                 SELECT
                     $console_select{run}
-                    WHERE $need_update{run} $runs_filter
+                    WHERE $sc->{run} $need_update{run} $runs_filter
                 UNION
                 SELECT
                     $console_select{question}
                     FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                    WHERE $need_update{question} AND
+                    WHERE $mc->{question} $need_update{question} AND
                     Q.account_id=CA.id AND A.id=CA.account_id$msg_filter
                 UNION
                 SELECT
                     $console_select{message}
                     FROM messages M, contest_accounts CA, dummy_table D, accounts A
-                    WHERE $need_update{message} AND
+                    WHERE $mc->{message} $need_update{message} AND
                     M.account_id = CA.id AND A.id = CA.account_id$msg_filter
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
-            $c->execute(($length, $luts, @cid) x 3, @length_and_luts3);
+            $dtst->execute($lengths, @sp, $lutss, @cid, ($lengthm, @mp, $lutsm, @cid) x 2, @bcp);
         } elsif ($is_team) {
-            $c = $dbh->prepare(qq~
+            $dtst = $dbh->prepare(qq~
                 SELECT
                     $console_select{run}
-                    WHERE $need_update{run} AND
+                    WHERE $sc->{run} $need_update{run} AND
                         C.id=? AND CA.is_hidden=0 AND
                         (A.id=? OR R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
                 UNION
                 SELECT
                     $console_select{question}
                     FROM questions Q, contest_accounts CA, dummy_table D, accounts A
-                    WHERE $need_update{question} AND
+                    WHERE $mc->{question} $need_update{question} AND
                         Q.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
                 UNION
                 SELECT
                     $console_select{message}
                     FROM messages M, contest_accounts CA, dummy_table D, accounts A 
-                    WHERE $need_update{message} AND
+                    WHERE $mc->{message} $need_update{message} AND
                         M.account_id=CA.id AND CA.contest_id=? AND CA.account_id=A.id AND A.id=?
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
-            $c->execute(($length, $luts, $cid, $uid) x 3, @length_and_luts3);
+            $dtst->execute($lengths, @sp, $lutss, $cid, $uid, ($lengthm, @mp, $lutsm, $cid, $uid) x 2, @bcp);
         } else {
-            $c = $dbh->prepare(qq~
+            $dtst = $dbh->prepare(qq~
                 SELECT
                     $console_select{run}
-                    WHERE $need_update{run} AND
+                    WHERE $sc->{run} $need_update{run} AND
                         R.contest_id=? AND CA.is_hidden=0 AND 
                         (R.submit_time < C.freeze_date OR CURRENT_TIMESTAMP > C.defreeze_date)
                 $broadcast
                 $contest_start_finish
                 ORDER BY 2 DESC~);
-            $c->execute($length, $luts, $cid, @length_and_luts3);
+            $dtst->execute($lengths, @sp, $lutss, $cid, @bcp);
         }
          
         my (@submission, @contests, @messages);
@@ -343,7 +401,7 @@ sub make_response {
             'time' => 'submit_time',
         );
     
-        while (my $r = $c->fetchrow_hashref) {
+        while (my $r = $dtst->fetchrow_hashref) {
             #$_ = Encode::decode_utf8 $_ for values %{$r}; #DBD::InterBase driver doesn't work with utf-8
             @{$r}{qw/last_ip_short last_ip/} = CATS::IP::short_long(CATS::IP::filter_ip($r->{last_ip}));
             
@@ -352,9 +410,10 @@ sub make_response {
                 my $param = shift;
                 $current_row{$param} = $r->{$param} || $r->{$alias_link{$param}};
             };
-             
-            $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
-                
+            {
+                no warnings 'uninitialized';
+                $add_row->($_) for qw/time last_console_update failed_test question team_id id/;
+            }    
             $current_row{rtype} = --$r->{rtype};
             $current_row{title} = $r->{title} if $r->{rtype} >= $cons_contest_start;
             
@@ -387,13 +446,25 @@ sub make_response {
             
             push @{$rtype_ref[$r->{rtype}]}, \%current_row;
         }
-        push (@{$res_seq}, {
-           'submissions' => [reverse @submission],
-           'contests' => [reverse @contests],
-           'messages'=> [reverse @messages],
-           'type' => $_->{type},
-           'time' => $_->{$_->{type}},
-       });
+        
+        my $ans = {
+            'submissions' => [reverse @submission],
+            'contests' => [reverse @contests],
+            'messages'=> [reverse @messages],
+        };
+        {
+            no warnings 'uninitialized';
+            for (map({
+                data => $ans->{$_},
+                data_type => $_,
+                'type' => $k{$_}->{type},
+                'since' => $k{$_}->{since},
+                'to' => $k{$_}->{to},
+            }, @kinds)) {
+                push (@{$res_seq}, $_) if $_->{type} ne 'none';
+            }
+        }
+        $i++;
     }
     
     $self->set_specific_param('fragments', $res_seq);
