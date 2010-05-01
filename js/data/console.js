@@ -79,11 +79,9 @@ const DataConsoleFragment = $.inherit(
             this.since = since;
             this.to = to;
             this.seq = seq;
-            if (!defined(since)) {
+            if (dataType == 'top') {
                 this.since = seq[0].time;
-            }
-            if (!defined(to)) {
-                since.to = DataConsoleDateInf;
+                this.to = DataConsoleDateInf;
             }
             this.length = seq.length;
             this.i = 0;
