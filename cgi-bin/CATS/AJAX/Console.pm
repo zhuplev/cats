@@ -56,7 +56,7 @@ sub timestamp_change {
     } else {
         $msec += $d;
     }
-    $timestamp = sprintf $timestamp_format, $year, $mon, $mday, $hour, $min, $sec, $msec;
+    $timestamp = sprintf $timestamp_format, $year+1900, $mon, $mday, $hour, $min, $sec, $msec;
     return $timestamp;
 
 }
