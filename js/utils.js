@@ -86,15 +86,6 @@ Array.prototype.insertAfter = function(list, num, elem) {
 }
 
 
-Object.size = function(obj) {
-    var size = 0;
-    for (var key in obj) {
-        if (obj.hasOwnProperty(key)) size++;
-    }
-    return size;
-}
-
-
 function defined(obj) {
     return obj != undefined;
 }
