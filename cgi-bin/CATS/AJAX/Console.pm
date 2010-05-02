@@ -398,7 +398,7 @@ sub make_response {
             $dtst->execute($lengths, @sp, $lutss, $cid, $uid, ($lengthm, @mp, $lutsm, $cid, $uid) x 2, @bcp);
         } else {
             $dtst = $dbh->prepare(qq~
-                SELECT
+                SELECT * FROM ( SELECT
                     $console_select{run}
                     WHERE $sc->{run} $need_update{run} AND
                         R.contest_id=? AND CA.is_hidden=0 AND 
@@ -492,7 +492,7 @@ sub make_response {
                 'since' => $k{$_}->{since},
                 'to' => $k{$_}->{to},
             }, @kinds)) {
-                push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$ans->{$_}};
+                push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$_->{data}};
             }
         }
         $i++;
