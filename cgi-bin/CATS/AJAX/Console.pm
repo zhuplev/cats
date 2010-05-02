@@ -488,9 +488,10 @@ sub make_response {
             for (map({
                 data => $ans->{$_},
                 data_type => $_,
-                'type' => $k{$_}->{type},
-                'since' => $k{$_}->{since},
-                'to' => $k{$_}->{to},
+                type => $k{$_}->{type},
+                since => $k{$_}->{since},
+                to => $k{$_}->{to},
+                is_modify => ($k{$_}->{is_modify} ? 1 : 0),
             }, @kinds)) {
                 push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$_->{data}};
             }
