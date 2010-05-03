@@ -53,36 +53,55 @@ String.format = function() {
 }
 
 
-String.min = function(a, b) {
-    return a < b ? a : b;
-}
-
-
-String.max = function(a, b) {
-    return a > b ? a : b;
-}
-
-
-Array.prototype.append = function(a, b) {
-    var result = a;
-    for (var i in b) {
-        result.push(b[i]);
-    }
-    return result;
-}
-
-
-Array.prototype.insertAfter = function(list, num, elem) {
-    var result = list;
-    result.push(undefined);
-    var i = result.length - 1;
+Array.prototype.insertAfter = function(num, elem) {
+    this.push(undefined);
+    var i = this.length - 1;
     num++;
     while (i > num) {
-        result[i] = result[i-1];
+        this[i] = this[i-1];
         i--;
     }
-    result[i] = elem;
-    return result;
+    this[i] = elem;
+}
+
+
+function timestampToDate(timestamp) {
+    var m = timestamp.match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/);
+    for (var i = 1; i < m.length; i++) {
+        m[i] -= 0; //toInt
+    }
+    return new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6], m[7]/10);
+}
+
+
+function dateToTimestamp(date) {
+    var year = zeroFill(date.getFullYear(), 4);
+    var mon = zeroFill(date.getMonth() + 1, 2);
+    var mday = zeroFill(date.getDate(), 2);
+    var hour = zeroFill(date.getHours(), 2);
+    var min = zeroFill(date.getMinutes(), 2);
+    var sec = zeroFill(date.getSeconds(), 2);
+    var msec = zeroFill(date.getMilliseconds() * 10, 4, true);
+    return String.format('{0}-{1}-{2} {3}:{4}:{5}.{6}', year, mon, mday, hour, min, sec, msec);
+}
+
+
+function zeroFill (value, capacity, after) {
+    value += ''; //toString
+    while (value.length < capacity) {
+        if (after) {
+            value += '0';
+        } else {
+            value = '0' + value;
+        }
+    }
+    return value;
+}
+
+
+Date.prototype.msecAdd = function(msec) {
+    this.setMilliseconds(this.getMilliseconds() + msec);
+    return this;
 }
 
 
@@ -112,6 +131,10 @@ const Timer = $.inherit(
         
         stop : function() {
             this.updating = false;
+        },
+        
+        restart : function() {
+            window.setTimeout(utils.delegate(this, this.timer), this.upTime);
         },
         
         changeUpTime : function(newUpTime) {

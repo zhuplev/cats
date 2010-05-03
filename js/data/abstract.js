@@ -34,7 +34,6 @@ const DataAbstract = $.inherit(
             for (var _ in this.param) {
                 r += String.format(';{0}={1}', _, this.param[_]);
             }
-            this.setJSON('last_update_timestamp', this.lastUpdateTimestamp);
             return String.format(r, $.toJSON(this.json));
         },
         

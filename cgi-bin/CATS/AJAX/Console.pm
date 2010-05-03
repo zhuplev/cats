@@ -18,7 +18,7 @@ sub required_json_params { #deprecated
 
 
 sub optional_json_params {
-    return qw~fragments~;
+    return qw~fragments fragment_size~;
 }
 
 
@@ -49,11 +49,10 @@ sub timestamp_change {
     my $timestamp_format = '%0.2d-%0.2d-%0.2d %0.2d:%0.2d:%0.2d.%0.4d';
     $timestamp =~ /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d).(\d{4})$/;
     my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst, $msec) = ($6, $5, $4, $3, $2, $1, undef, undef, undef, $7);
-    my $q = $msec + $d;
-    if ($msec + $d < 0 || $msec + $d > 10000) {
-        ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(timelocal($sec, $min, $hour, $mday, $mon, $year) + $d);
-        $year += 1900;
-        $msec = (10000 * 10000 + $d) % 10000;
+    if ($msec + $d < 0 || $msec + $d > 9999) {
+        ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(timelocal($sec, $min, $hour, $mday, $mon-1, $year) + $d);
+        $year += 1900; $mon++;
+        $msec = (10000 * 10 + $d) % 10000;
     } else {
         $msec += $d;
     }
@@ -301,6 +300,7 @@ sub make_response {
                 'top' => [],
                 'none' => [],
             );
+            die $kv->{to} if $kv->{since} eq '2010-03-18 22:17:54.10000';
             return @{$v{$kv->{type}}};
         };
         
@@ -482,26 +482,28 @@ sub make_response {
                 shift @{$ans->{$_}} while @{$ans->{$_}} > $length{$_};
                 $k{$_}->{since} = $ans->{$_}->[0]->{time},
             }
+            $k{$_}->{since} ||= $ans->{$_}->[0]->{time} if @{$ans->{$_}};
         }
         {
             no warnings 'uninitialized';
             for (map({
-                data => $ans->{$_},
+                seq => $ans->{$_},
                 data_type => $_,
                 type => $k{$_}->{type},
                 since => $k{$_}->{since},
                 to => $k{$_}->{to},
                 is_modify => ($k{$_}->{is_modify} ? 1 : 0),
             }, @kinds)) {
-                push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$_->{data}};
+                push (@{$res_seq}, $_) if $_->{type} ne 'none' && @{$_->{seq}};
             }
         }
         $i++;
     }
     
-    $self->set_specific_param('fragments', $res_seq);
-    $self->set_specific_param('problems', $problems);
-    $self->set_specific_param('teams', $teams);
+    $self->set_specific_param('fragments', $res_seq) if @{$res_seq};
+    $self->set_specific_param('problems', $problems) if %{$problems};
+    $self->set_specific_param('teams', $teams) if %{$teams};
+    $self->set_specific_param('fragment_size', $cats::max_fragment_row_count) if $self->{var}->{fragment_size};
 }
 
 

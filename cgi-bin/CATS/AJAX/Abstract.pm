@@ -64,9 +64,8 @@ sub get_response {
     my $self = shift;
     my $json = JSON::XS->new;
     #$json->utf8(1);
+    $self->{response}->{server_timestamp} = $self->{var}->{server_timestamp} if %{$self->{response}};
     $self->{response}->{result} ||= 'ok';
-    $self->{response}->{server_timestamp} = $self->{var}->{server_timestamp};
-    
     return $json->encode($self->{response});
 }
 

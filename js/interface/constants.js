@@ -70,3 +70,6 @@ const submitStatus = {
         class: "submit_status_ignore",
     },
 };
+
+
+const ajaxPageLoaderImg = './images/std/ajax-page-loader.gif';

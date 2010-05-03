@@ -61,9 +61,21 @@ function fill_1(aid, arg)
         dataset = new DataConsole();
         interface = new InterfaceConsole();
     }
+    
+    function setNewTimestampToDataset() {
+        dataset.changeTime($('#timestamp').val()+'');
+        $('#curr_timestamp').html($('#timestamp').val()+'');
+        return false;
+    }
+    
 </script>
 
 <TMPL_IF message><i><TMPL_VAR message ESCAPE=HTML></i><br/></TMPL_IF>
+<div>
+    <input type="text" id="timestamp" size="30"/>
+    <a onclick="setNewTimestampToDataset(); return false;">установить =)</a>
+    <span id="curr_timestamp">top</span>
+</div>
 <span id="refreshable_content">
 <img src="./images/std/ajax-page-loader.gif"/>
 </span>

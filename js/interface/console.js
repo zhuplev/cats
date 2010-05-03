@@ -108,16 +108,20 @@ const InterfaceConsole = $.inherit(
         
         onUpdate : function() {
             var consoleContent = '';
-            for (var i in dataset.current) {
-                var component = new this.__self.Line[dataset.current[i].rtype](dataset, dataset.current[i]);
-                consoleContent += component.html();
-            }
+            var currentConsole = dataset.getConsole();
+            if (currentConsole.length == 0) {
+                consoleContent = String.format('<img src="{0}"/>', ajaxPageLoaderImg);
+            } else {
+                for (var i = 0; i < currentConsole.length; i++) {
+                    var component = new this.__self.Line[currentConsole[i].rtype](dataset, currentConsole[i]);
+                    consoleContent += component.html();
+                }
+            }    
             $('#refreshable_content').html(this.__self.consoleHeader + consoleContent + this.__self.consoleFooter);
-            $('#server_time').html(this.dataset.time);
+            $('#server_time').html(this.dataset.serverTime);
         },
         
         onFirstUpdate : function() {
-            
             this.problemlistChange();
         },
         
