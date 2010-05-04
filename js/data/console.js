@@ -120,6 +120,7 @@ const DataConsole = $.inherit(
         },
         
         response : function(dataResponse, textStatus, XMLHttpRequest) {
+            this.serverTime = dataResponse.server_timestamp;
             this.updateIds(dataResponse, 'teams');
             this.updateIds(dataResponse, 'problems');
             var isModify = {};
@@ -134,7 +135,6 @@ const DataConsole = $.inherit(
                 }
                 fr = fr.fragments;
                 if (defined(fr)) {
-                    this.serverTime = dataResponse.server_timestamp;
                     for (var i = 0;  i < fr.length; i++) {
                         var frdt = fr[i].data_type;
                         this.dataType[frdt].addFragment(this.serverTime, fr[i]);
